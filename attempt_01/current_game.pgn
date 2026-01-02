@@ -1,0 +1,10 @@
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.01"]
+[Round "5"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "*"]
+
+1. e4 c5 2. Nf3 a6 3. Be2 Qc7 4. Nc3 e6 5. d4 cxd4 6. Nxd4 Be7 7. g3 b5 8. Bf4 Qb6 9. a4 b4 10. Nf5 Bb7 11. a5 Qd8 12. Nxg7+ Kf8 13. Qd4 Nc6 14. Nxe6+ dxe6 15. Qxh8 Bf6 16. Qxh7 Qe7 17. Bh5 Bg7 18. Rd1 bxc3 19. Bd6 Qxd6 20. Rxd6 *
+
