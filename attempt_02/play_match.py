@@ -6,13 +6,27 @@ Plays 100 games and reports results.
 import chess
 import chess.pgn
 import chess.engine
+import chess.polyglot
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import gzip
+import json
+import msgpack
+import requests
 from typing import Tuple, Optional, TextIO
 from datetime import datetime
 import time
+
+# Cloud GPU inference endpoint
+MODEL_INFERENCE_URL = "https://alba-nondedicative-roxann.ngrok-free.dev/evaluate"
+HEADERS = {
+    "ngrok-skip-browser-warning": "true",
+    "Content-Encoding": "gzip",
+    "Content-Type": "application/json",
+    "Accept-Encoding": "gzip"
+}
 
 # =============================================================================
 # NEURAL NETWORK (copied from chess_engine.py)
@@ -115,71 +129,135 @@ class ChessNet(nn.Module):
 
 
 # =============================================================================
-# MINIMAX SEARCH WITH ALPHA-BETA PRUNING
+# MINIMAX SEARCH (FULL TREE)
 # =============================================================================
 
 class NNPlayer:
-    """Neural network player with minimax search."""
+    """Neural network player with minimax search using cloud GPU inference."""
+
+    BATCH_SIZE = 1024 * 8
+    OPENING_BOOK_FILE = "opening_book.csv"
 
     def __init__(self, model_path: str, device: str = 'auto', search_depth: int = 3):
-        if device == 'auto':
-            if torch.cuda.is_available():
-                self.device = torch.device('cuda')
-            elif torch.backends.mps.is_available():
-                self.device = torch.device('mps')
-            else:
-                self.device = torch.device('cpu')
-        else:
-            self.device = torch.device(device)
-
-        self.model = ChessNet(initial_channels=512, res_channels=256, num_res_blocks=8)
-
-        # Load model
-        print(f"Loading model from {model_path}...")
-        checkpoint = torch.load(model_path, map_location=self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.model.to(self.device)
-        self.model.eval()
-
+        # model_path kept for API compatibility but not used (cloud handles model)
+        print(f"Using cloud inference at {MODEL_INFERENCE_URL}")
         self.search_depth = search_depth
         self.nodes_evaluated = 0
+        self.eval_cache = {}
+        self.cloud_inference_time = 0.0  # Time spent on remote inference calls
+        self.cache_hits = 0  # Cache hits for last move
+        self.cache_requests = 0  # Total positions requested for last move
+        self.used_opening_book = False  # True if last move came from opening book
+        self.opening_book = self._load_opening_book()
+
+    def _load_opening_book(self) -> dict:
+        """Load opening book from CSV file if it exists."""
+        import os
+        import csv
+        if os.path.exists(self.OPENING_BOOK_FILE):
+            book = {}
+            with open(self.OPENING_BOOK_FILE, 'r', newline='') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) == 2:
+                        fen, move = row
+                        book[fen] = move
+            print(f"Loaded opening book with {len(book):,} positions")
+            return book
+        print("No opening book found")
+        return {}
+
+    def clear_cache(self):
+        """Clear the evaluation cache. Call between games."""
+        self.eval_cache = {}
+
+    @staticmethod
+    def compact_fen(fen: str) -> str:
+        """Remove halfmove clock and fullmove number from FEN."""
+        parts = fen.split()
+        return ' '.join(parts[:4])
+
+    def evaluate_batch_cloud(self, fens: list) -> dict:
+        """
+        Send batch of FENs to cloud GPU for evaluation.
+        Returns dict mapping FEN -> score.
+        Accumulates time spent on HTTP requests in self.cloud_inference_time.
+        """
+        results = {}
+        for i in range(0, len(fens), self.BATCH_SIZE):
+            batch = fens[i:i + self.BATCH_SIZE]
+            #payload = gzip.compress(json.dumps({"fens": batch}).encode())
+            payload = gzip.compress(msgpack.packb({"fens": batch}))
+            request_start = time.time()
+            response = requests.post(
+                MODEL_INFERENCE_URL,
+                data=payload,
+                headers=HEADERS,
+                timeout=120
+            )
+            response.raise_for_status()
+            scores = response.json()["scores"]
+            self.cloud_inference_time += time.time() - request_start
+            for fen, score in zip(batch, scores):
+                results[fen] = score
+        return results
+
+    def collect_leaf_positions(self, board: chess.Board, depth: int) -> list:
+        """
+        Collect all positions at leaf nodes (depth 0) for batch evaluation.
+        Returns list of (zobrist_hash, compact_fen) tuples.
+        FEN is None if position is already cached (skips expensive FEN generation).
+        """
+        # Terminal conditions - no position needed
+        if board.is_game_over():
+            return []
+
+        # Leaf node - collect hash, only generate FEN if not cached
+        if depth == 0:
+            z_hash = chess.polyglot.zobrist_hash(board)
+            if z_hash in self.eval_cache:
+                return [(z_hash, None)]  # Already cached, skip FEN generation
+            fen = self.compact_fen(board.fen())
+            return [(z_hash, fen)]
+
+        # Recurse through all legal moves
+        positions = []
+        for move in board.legal_moves:
+            board.push(move)
+            positions.extend(self.collect_leaf_positions(board, depth - 1))
+            board.pop()
+        return positions
 
     def evaluate(self, board: chess.Board) -> float:
         """
-        Evaluate position using neural network.
+        Evaluate position using cached cloud results.
         Returns score from white's perspective (positive = white better).
         """
         self.nodes_evaluated += 1
-        fen = board.fen()
-        board_tensor = fen_to_tensor(fen).unsqueeze(0).to(self.device)
+        z_hash = chess.polyglot.zobrist_hash(board)
+        if z_hash in self.eval_cache:
+            return self.eval_cache[z_hash]
+        # Fallback: position not in cache (shouldn't happen if pre-collection is correct)
+        raise ValueError(f"Position not found in cache: {z_hash}")
 
-        with torch.no_grad():
-            score = self.model(board_tensor).item()
-
-        return score
-
-    def minimax(self, board: chess.Board, depth: int, alpha: float, beta: float, maximizing: bool) -> float:
+    def minimax(self, board: chess.Board, depth: int, maximizing: bool) -> float:
         """
-        Minimax search with alpha-beta pruning.
+        Full minimax search.
 
         Args:
             board: Current position
             depth: Remaining search depth
-            alpha: Alpha value for pruning
-            beta: Beta value for pruning
             maximizing: True if maximizing player (white)
 
         Returns:
             Position evaluation
         """
         # Terminal conditions
-        if board.is_checkmate():
-            # Prefer faster mates by adding depth bonus
-            # Higher depth = found checkmate earlier = faster mate
-            # Winning side wants fast mates (higher score), losing side wants slow mates
-            return (-1.0 - depth * 0.01) if maximizing else (1.0 + depth * 0.01)
-        if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
-            return 0.0
+        if board.is_game_over():
+            if board.is_checkmate():
+                # Prefer faster mates by adding depth bonus
+                return (-1.0 - depth * 0.01) if maximizing else (1.0 + depth * 0.01)
+            return 0.0  # Stalemate or draw
 
         # Leaf node - use neural network
         if depth == 0:
@@ -191,28 +269,61 @@ class NNPlayer:
             max_eval = -float('inf')
             for move in legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, depth - 1, alpha, beta, False)
+                eval_score = self.minimax(board, depth - 1, False)
                 board.pop()
                 max_eval = max(max_eval, eval_score)
-                alpha = max(alpha, eval_score)
-                if beta <= alpha:
-                    break
             return max_eval
         else:
             min_eval = float('inf')
             for move in legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, depth - 1, alpha, beta, True)
+                eval_score = self.minimax(board, depth - 1, True)
                 board.pop()
                 min_eval = min(min_eval, eval_score)
-                beta = min(beta, eval_score)
-                if beta <= alpha:
-                    break
             return min_eval
 
     def get_best_move(self, board: chess.Board) -> chess.Move:
-        """Find the best move using minimax search."""
+        """Find the best move using minimax search with cloud batch evaluation."""
         self.nodes_evaluated = 0
+        self.cloud_inference_time = 0.0  # Reset inference time for this move
+        self.used_opening_book = False
+
+        # Check opening book first
+        if self.opening_book:
+            fen = self.compact_fen(board.fen())
+            if fen in self.opening_book:
+                move_uci = self.opening_book[fen]
+                move = chess.Move.from_uci(move_uci)
+                if move in board.legal_moves:
+                    self.used_opening_book = True
+                    return move
+
+        # Step 1: Collect all leaf positions (hash, fen) tuples
+        leaf_positions = self.collect_leaf_positions(board, self.search_depth)
+
+        # Step 2: Deduplicate by hash
+        unique_positions = {}  # hash -> fen (fen is None if already cached)
+        for z_hash, fen in leaf_positions:
+            if z_hash not in unique_positions:
+                unique_positions[z_hash] = fen
+
+        # Step 3: Filter to positions needing evaluation (fen is not None)
+        # If fen is None, position was already in cache during collection
+        new_positions = {h: f for h, f in unique_positions.items() if f is not None}
+        self.cache_requests = len(unique_positions)
+        self.cache_hits = len(unique_positions) - len(new_positions)
+
+        # Step 4: Batch evaluate only NEW positions via cloud GPU
+        if new_positions:
+            # Send FENs to cloud, get scores back
+            fens_to_eval = list(new_positions.values())
+            hashes_to_eval = list(new_positions.keys())
+            scores = self.evaluate_batch_cloud(fens_to_eval)
+            # Store results keyed by hash
+            for z_hash, fen in zip(hashes_to_eval, fens_to_eval):
+                self.eval_cache[z_hash] = scores[fen]
+
+        # Step 5: Run minimax search using cached evaluations
         best_move = None
         maximizing = board.turn == chess.WHITE
 
@@ -220,7 +331,7 @@ class NNPlayer:
             best_eval = -float('inf')
             for move in board.legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, self.search_depth - 1, -float('inf'), float('inf'), False)
+                eval_score = self.minimax(board, self.search_depth - 1, False)
                 board.pop()
                 if eval_score > best_eval:
                     best_eval = eval_score
@@ -229,7 +340,7 @@ class NNPlayer:
             best_eval = float('inf')
             for move in board.legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, self.search_depth - 1, -float('inf'), float('inf'), True)
+                eval_score = self.minimax(board, self.search_depth - 1, True)
                 board.pop()
                 if eval_score < best_eval:
                     best_eval = eval_score
@@ -294,11 +405,26 @@ def play_game(nn_player: NNPlayer, engine: chess.engine.SimpleEngine,
                 move = nn_player.get_best_move(board)
                 eval_time = time.time() - eval_start
 
+        # Get SAN notation before pushing the move
+        move_san = board.san(move)
+        player = "NN" if nn_move else "SF"
+
         if nn_move:
-            evals_per_sec = nn_player.nodes_evaluated / eval_time if eval_time > 0 else 0
-            print(f"  Game {game_num}, Move {move_count}: {move.uci()} | "
-                  f"Evals: {nn_player.nodes_evaluated:,} | Time: {eval_time:.2f}s | "
-                  f"{evals_per_sec:,.0f} evals/s")
+            if nn_player.used_opening_book:
+                print(f"  Game {game_num}, Move {move_count} ({player}): {move_san} | "
+                      f"[BOOK] {eval_time:.3f}s", flush=True)
+            else:
+                cloud_time = nn_player.cloud_inference_time
+                local_time = eval_time - cloud_time
+                evals_per_sec = nn_player.nodes_evaluated / cloud_time if cloud_time > 0 else 0
+                cache_pct = 100 * nn_player.cache_hits / nn_player.cache_requests if nn_player.cache_requests > 0 else 0
+                new_evals = nn_player.cache_requests - nn_player.cache_hits
+                print(f"  Game {game_num}, Move {move_count} ({player}): {move_san} | "
+                      f"Positions: {nn_player.cache_requests:,} (new: {new_evals:,}, cached: {nn_player.cache_hits:,}, {cache_pct:.0f}%) | "
+                      f"Total: {eval_time:.2f}s (cloud: {cloud_time:.2f}s, local: {local_time:.2f}s) | "
+                      f"{evals_per_sec:,.0f} evals/s", flush=True)
+        else:
+            print(f"  Game {game_num}, Move {move_count} ({player}): {move_san}", flush=True)
 
         # Add move to PGN game tree
         node = node.add_variation(move)
@@ -384,6 +510,9 @@ def run_match(model_path: str, stockfish_path: str, num_games: int = 100,
 
     try:
         for game_num in range(1, num_games + 1):
+            # Clear cache between games
+            nn_player.clear_cache()
+
             # Alternate colors
             nn_is_white = (game_num % 2 == 1)
 
@@ -467,7 +596,7 @@ if __name__ == "__main__":
     MODEL_PATH = "chess_model_epoch070.pt"
     STOCKFISH_PATH = "/opt/homebrew/bin/stockfish"  # Adjust for your system
     NUM_GAMES = 100
-    TIME_LIMIT = 10.0  # seconds per move for Stockfish
+    TIME_LIMIT = 5.0  # seconds per move for Stockfish
     SEARCH_DEPTH = 3  # ply for NN player
 
     # Check for command line arguments
