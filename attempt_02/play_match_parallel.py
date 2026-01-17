@@ -19,7 +19,7 @@ from datetime import datetime
 import time
 
 # Cloud GPU inference endpoint
-MODEL_INFERENCE_URL = "https://alba-nondedicative-roxann.ngrok-free.dev/evaluate"
+MODEL_INFERENCE_URL = "https://feel-roy-view-archived.trycloudflare.com/evaluate"
 HEADERS = {
     "ngrok-skip-browser-warning": "true",
     "Content-Encoding": "gzip",
@@ -272,6 +272,14 @@ class GameState:
         """Check if it's the neural network's turn."""
         return (self.board.turn == chess.WHITE) == self.nn_is_white
 
+    def format_move_number(self) -> str:
+        """Format move number in chess notation (1.  for white, 1.. for black)."""
+        move_num = (self.move_count // 2) + 1
+        if self.move_count % 2 == 0:
+            return f"{move_num}. "  # Extra space for alignment
+        else:
+            return f"{move_num}.."
+
     def make_move(self, move: chess.Move):
         """Make a move and update game state."""
         self.move_count += 1
@@ -393,10 +401,11 @@ def run_parallel_match(
 
                     for game, (move, stats) in zip(nn_turn_games, move_results):
                         move_san = game.board.san(move)
+                        move_label = game.format_move_number()
                         if stats['from_book']:
-                            print(f"  Game {game.game_num}, Move {game.move_count + 1} (NN): {move_san} | [BOOK]", flush=True)
+                            print(f"  Game {game.game_num}, {move_label} (NN): {move_san} | [BOOK]", flush=True)
                         else:
-                            print(f"  Game {game.game_num}, Move {game.move_count + 1} (NN): {move_san} | "
+                            print(f"  Game {game.game_num}, {move_label} (NN): {move_san} | "
                                   f"Positions: {stats['positions']:,}", flush=True)
                         game.make_move(move)
                         moves_this_batch += 1
@@ -407,7 +416,8 @@ def run_parallel_match(
                     result = engines[engine_idx].play(game.board, chess.engine.Limit(time=time_limit))
                     move = result.move
                     move_san = game.board.san(move)
-                    print(f"  Game {game.game_num}, Move {game.move_count + 1} (SF): {move_san}", flush=True)
+                    move_label = game.format_move_number()
+                    print(f"  Game {game.game_num}, {move_label} (SF): {move_san}", flush=True)
                     game.make_move(move)
                     moves_this_batch += 1
 
