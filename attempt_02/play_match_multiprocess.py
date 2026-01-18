@@ -19,7 +19,7 @@ from datetime import datetime
 import time
 
 # Cloud GPU inference endpoint
-MODEL_INFERENCE_URL = "https://legislation-champion-gonna-ventures.trycloudflare.com/evaluate"
+MODEL_INFERENCE_URL = "https://vision-acer-bigger-indicating.trycloudflare.com/evaluate"
 HEADERS = {
     "ngrok-skip-browser-warning": "true",
     "Content-Encoding": "gzip",
@@ -162,8 +162,27 @@ class GameEvaluator:
         if book_move:
             return book_move, {'from_book': True, 'positions': 0, 'cloud_time': 0}
 
+        # Evaluate current position to check if we're in a winning position
+        # If |eval| > 7 pawns (normalized ~0.6), increase depth by 2
+        current_fen = self.compact_fen(board.fen())
+        current_hash = chess.polyglot.zobrist_hash(board)
+
+        if current_hash not in self.eval_cache:
+            scores = self.evaluate_batch_cloud([current_fen])
+            self.eval_cache[current_hash] = scores[current_fen]
+            self.positions_evaluated += 1
+
+        current_eval = self.eval_cache[current_hash]
+
+        # Use deeper search in winning positions (|eval| > ~7 pawns)
+        # tanh(7/10) ≈ 0.6
+        if abs(current_eval) > 0.6:
+            effective_depth = self.search_depth + 2
+        else:
+            effective_depth = self.search_depth
+
         # Collect leaf positions
-        leaf_positions = self.collect_leaf_positions(board, self.search_depth)
+        leaf_positions = self.collect_leaf_positions(board, effective_depth)
 
         # Deduplicate by hash
         unique_positions = {}
@@ -198,7 +217,7 @@ class GameEvaluator:
             best_eval = -float('inf')
             for move in board.legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, self.search_depth - 1, False)
+                eval_score = self.minimax(board, effective_depth - 1, False)
                 board.pop()
                 if eval_score > best_eval:
                     best_eval = eval_score
@@ -207,7 +226,7 @@ class GameEvaluator:
             best_eval = float('inf')
             for move in board.legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, self.search_depth - 1, True)
+                eval_score = self.minimax(board, effective_depth - 1, True)
                 board.pop()
                 if eval_score < best_eval:
                     best_eval = eval_score
@@ -216,7 +235,8 @@ class GameEvaluator:
         stats = {
             'from_book': False,
             'positions': total_positions,
-            'cloud_time': cloud_time
+            'cloud_time': cloud_time,
+            'depth': effective_depth
         }
         return best_move, stats
 
@@ -272,7 +292,11 @@ def play_single_game(args) -> dict:
                 if stats['from_book']:
                     print(f"  Game {game_num}, {move_label} (NN): {move_san} | [BOOK]", flush=True)
                 else:
-                    print(f"  Game {game_num}, {move_label} (NN): {move_san} | Positions: {stats['positions']:,}", flush=True)
+                    depth_info = f"d={stats['depth']}" if stats['depth'] != search_depth else ""
+                    if depth_info:
+                        print(f"  Game {game_num}, {move_label} (NN): {move_san} | Positions: {stats['positions']:,} [{depth_info}]", flush=True)
+                    else:
+                        print(f"  Game {game_num}, {move_label} (NN): {move_san} | Positions: {stats['positions']:,}", flush=True)
             else:
                 result = engine.play(board, chess.engine.Limit(time=time_limit))
                 move = result.move
