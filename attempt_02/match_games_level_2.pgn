@@ -1,0 +1,416 @@
+; Multiprocess Match: Neural Network vs Stockfish
+; Date: 2026-01-17 18:23:02
+; NN Search Depth: 3 ply
+; Stockfish Time: 5.0s per move
+; Worker Processes: 10
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "3"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 c6 2. e4 Nf6 3. e5 Ng8 4. Be2 d5 5. O-O Bg4 6. Ng5 h6 7. Nxf7 Bxe2 8. Qxe2 Kxf7 9. e6+ Kg6 10. Qd3+ Kh5 11. g4+ Kh4 12. Qg3+ Kg5 13. Qe5+ Kh4 14. Qh5# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "1"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+
+1. Nf3 e6 2. Nc3 d5 3. e4 Nf6 4. e5 Ne4 5. a3 Be7 6. d4 O-O 7. Bd3 c5 8. Nxe4 dxe4 9. Bxe4 Qc7 10. Bxh7+ Kxh7 11. Ng5+ Bxg5 12. Bxg5 Rh8 13. Qg4 Qa5+ 14. Bd2 Qb5 15. a4 Qc4 16. Qh4+ Kg8 17. Qd8+ Kh7 18. Qh4+ Kg8 19. Qd8+ Kh7 20. Qh4+ Kg8 21. Qd8+ Kh7 22. Qh4+ Kg8 23. Qd8+ Kh7 24. Qh4+ 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "8"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e3 Nf6 2. Ne2 c5 3. Nf4 e5 4. Nh3 d5 5. c4 d4 6. Be2 d3 7. Bf3 e4 8. b3 Nc6 9. Nf4 exf3 10. Qxf3 Nb4 11. Bb2 Bg4 12. Qxb7 Rb8 13. Ne6 Rxb7 14. Nxd8 Nc2+ 15. Kf1 Be2+ 16. Kg1 Kxd8 17. h3 Nxa1 18. Nc3 Nc2 19. f4 Be7 20. e4 Nh5 21. Kh2 Bh4 22. Nd5 Re8 23. Ra1 Nxa1 24. f5 Bg3+ 25. Kg1 Nxb3 26. Bc3 Rxe4 27. f6 Nd4 28. Ne7 Rb1# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "2"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e4 e5 2. Bc4 Nf6 3. Nc3 Bb4 4. Nd5 Nxd5 5. Qh5 O-O 6. Bxd5 c6 7. Bb3 Be7 8. a3 d5 9. Nf3 g6 10. Qh6 dxe4 11. Ng1 Bg5 12. Qh3 Bxh3 13. f4 Bh4+ 14. g3 Bg2 15. gxh4 Qxh4+ 16. Kd1 Bxh1 17. d4 Rd8 18. fxe5 Rxd4+ 19. Ke2 Qh5+ 20. Ke3 Rd8 21. Bd2 Qh6+ 22. Kf2 Rxd2+ 23. Kf1 Kh8 24. Bxf7 Kg7 25. Nh3 Nd7 26. e6 Rh8 27. Nf2 Rg8 28. Bxg8 Nf8 29. Ke1 Nd7 30. e7 Qf4 31. Nxh1 Kh8 32. Be6 Qe3+ 33. Kf1 Qf4+ 34. Ke1 Qe3+ 35. Kf1 Qf4+ 36. Ke1 Qe3+ 37. Kf1 Qf4+ 38. Ke1 Qe3+ 39. Kf1 Qf3+ 40. Nf2 Qxf2# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "5"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 e6 2. Nc3 d5 3. e4 d4 4. Nb5 Nf6 5. e5 a6 6. Nxc7+ Qxc7 7. exf6 Rg8 8. fxg7 Rxg7 9. Nxd4 Bd6 10. c3 e5 11. Nf3 Bd7 12. d4 f6 13. dxe5 Bxe5 14. Be3 Bf4 15. Qd4 Bxe3 16. fxe3 Bg4 17. Qxf6 Nc6 18. Be2 Rd8 19. Rf1 Rf7 20. Qh4 Qc8 21. h3 Ne5 22. Nxe5 Qc5 23. Nxf7 Qxc3+ 24. bxc3 Rd2 25. Nh8 Rxe2+ 26. Kd1 h6 27. Nf7 Rxa2+ 28. Qxg4 Rxa1+ 29. Ke2 b5 30. Nh8 Rxf1 31. Ng6 Rf6 32. Ne5 Kf8 33. Nd7+ Ke8 34. Nxf6+ Kf7 35. Ng8 a5 36. Ne7 Kxe7 37. Qc8 b4 38. Qh8 a4 39. Qb8 b3 40. Qe5+ Kf7 41. Qb8 Kg6 42. Qd6+ Kh5 43. Qf8 b2 44. Qg8 a3 45. Qg4# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "10"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e3 Nf6 2. Nc3 h6 3. Be2 e6 4. d4 Bb4 5. Nf3 Ne4 6. Qd3 Bxc3+ 7. bxc3 d5 8. Nd2 Nd6 9. e4 dxe4 10. Qg3 O-O 11. h4 c5 12. dxc5 Nf5 13. Qf4 Nc6 14. Nxe4 Qd5 15. Ba3 e5 16. Qg4 Kh8 17. Qf3 Be6 18. h5 Rad8 19. g4 Nfe7 20. Nd6 Rd7 21. Rg1 Rfd8 22. Qe3 Ng8 23. g5 hxg5 24. Bf3 e4 25. Rxg5 f5 26. Be2 Qe5 27. O-O-O Nf6 28. h6 gxh6 29. Rg6 f4 30. Rxh6+ Kg7 31. Qd2 Kxh6 32. Rg1 b6 33. Bc4 bxc5 34. Nf7+ Bxf7 35. Qe2 Bh5 36. f3 Qxc3 37. Qg2 Qa1# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "6"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. d4 Nf6 2. Nf3 e6 3. c4 c5 4. g3 cxd4 5. Qxd4 Na6 6. Nc3 Be7 7. Be3 Bc5 8. Qd2 Be7 9. a3 O-O 10. Rc1 Nc5 11. Rc2 Ng4 12. Bf4 e5 13. Bxe5 Nxe5 14. Nxe5 d6 15. Nd3 Be6 16. Bg2 Nb3 17. Qd1 Rc8 18. Bxb7 Rxc4 19. Ba6 Rd4 20. Bb5 a6 21. e3 Qa8 22. Rg1 Bg4 23. Ne2 Qe4 24. Rc3 axb5 25. Qxb3 Rc4 26. Qxb5 d5 27. h3 Bf3 28. g4 Bf6 29. Ndc1 Bxc3+ 30. bxc3 Ra8 31. Rg3 Bxe2 32. Nxe2 h6 33. g5 hxg5 34. Qb6 g4 35. hxg4 Qc2 36. Qb5 Rxa3 37. Qe8+ Kh7 38. Rh3+ Kg6 39. f4 Ra1+ 40. Kf2 Re4 41. f5+ Kg5 42. Qxf7 Re6 43. Qxg7+ Rg6 44. Rh5+ Kxg4 45. Qxg6# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "11"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 d5 2. d4 c6 3. Bf4 Qb6 4. Nc3 Qxb2 5. Bd2 Qb6 6. e4 Qd8 7. exd5 Nf6 8. dxc6 bxc6 9. Rb1 Bf5 10. Ne5 Qxd4 11. f4 e6 12. Qf3 Ne4 13. Nxe4 Bxe4 14. Qb3 Nd7 15. Nxd7 Qxd7 16. Bd3 Qd5 17. Qxd5 cxd5 18. Bb5+ Ke7 19. Bb4+ Kf6 20. Bc3+ Kg6 21. Bd3 f6 22. Bxe4+ dxe4 23. Ke2 Be7 24. Bb4 Bxb4 25. Rxb4 f5 26. Rc4 Rhc8 27. Rxc8 Rxc8 28. Kd2 Rc7 29. Rb1 h6 30. Rb3 Rd7+ 31. Ke3 Rc7 32. Kd2 Kf7 33. h3 Kf6 34. h4 g5 35. hxg5+ Kf7 36. gxh6 Rd7+ 37. Ke3 Kg8 38. c4 Rd6 39. g4 fxg4 40. c5 Rd5 41. Rb8+ Kh7 42. c6 Rd3+ 43. Kxe4 Rc3 44. Rb7+ Kxh6 45. c7 g3 46. Ke5 g2 47. Rb1 Rxc7 48. Kxe6 Rc2 49. a3 Re2+ 50. Kf6 a5 51. Rb8 Re6+ 52. Kxe6 g1=Q 53. Rh8+ Kg7 54. Ra8 Qc5 55. Rb8 Qa7 56. Rb1 Qc7 57. Rg1+ Kf8 58. Rb1 Qc4+ 59. Ke5 Qc3+ 60. Ke6 Qc8+ 61. Kf6 Qc7 62. Ke6 Qc6+ 63. Ke5 Qc5+ 64. Ke6 Qe3+ 65. Kf6 Qc3+ 66. Ke6 Qxa3 67. Rb8+ Kg7 68. Rb7+ Kh6 69. Rb5 a4 70. Kf6 Qd6+ 71. Kf7 Qxf4+ 72. Ke6 Qf3 73. Ra5 a3 74. Ra6 Qe2+ 75. Kf7+ Qxa6 76. Kg8 a2 77. Kf8 a1=Q 78. Ke8 Q6f6 79. Kd7 Qa7+ 80. Ke8 Qae7# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "9"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 c6 2. e4 Qa5 3. c3 Qc7 4. Bc4 Nf6 5. e5 Nd5 6. d4 e6 7. Bd3 d6 8. Bd2 c5 9. Na3 Bd7 10. exd6 Bxd6 11. O-O Bc6 12. Re1 Be7 13. Nb5 Qb6 14. dxc5 Qxc5 15. b4 Qb6 16. Nbd4 Nf6 17. Ne5 O-O 18. Bg5 Bd5 19. Bxf6 Bxf6 20. Bxh7+ Kxh7 21. Qh5+ Kg8 22. Re3 g6 23. Nxg6 fxg6 24. Qxg6+ Bg7 25. Nxe6 Rf7 26. Rae1 Na6 27. R1e2 Nc7 28. Qg4 Nxe6 29. Qg3 Qc6 30. b5 Qc5 31. Rxe6 Qc8 32. Rg6 Qf5 33. Re1 Raf8 34. c4 Be4 35. Rg5 Qxf2+ 36. Qxf2 Rxf2 37. Rxg7+ Kxg7 38. a3 Rd2 39. Kh1 b6 40. h3 Rf4 41. Rg1 Kf8 42. Kh2 Ba8 43. Kg3 Rxc4 44. Rf1+ Ke7 45. Re1+ Kd7 46. Rg1 Kd6 47. Kh2 Kc5 48. h4 Rxh4+ 49. Kg3 Re4 50. Kh3 Rd3+ 51. g3 Rc4 52. Kh2 Be4 53. Kh3 Ba8 54. Kh2 Bb7 55. Rf1 Rd2+ 56. Kh3 Bg2+ 57. Kh2 Bxf1+ 58. Kh1 Rc1 59. Kg1 Bh3# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "12"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. d4 Nf6 2. Bg5 Ne4 3. Bf4 g5 4. Bc1 d5 5. f3 Nd6 6. e4 dxe4 7. fxe4 Nxe4 8. Nc3 Nxc3 9. Qh5 Qxd4 10. Qf3 Qe5+ 11. Ne2 Nd5 12. Qg3 Bg7 13. Bxg5 Qxb2 14. Rc1 Rg8 15. c4 Be5 16. Qh4 Nb4 17. Bxe7 Rg4 18. Qh3 Re4 19. g4 Bxg4 20. Qf3 Bxf3 21. Kf2 Kxe7 22. Rd1 Nd7 23. Kxf3 Nf6 24. Rg1 Bxh2 25. Rg5 Rh8 26. Kg2 Rg8 27. Rxg8 Nxg8 28. Rb1 Rg4+ 29. Kh1 Qf6 30. Bg2 Nh6 31. Rxb4 Kf8 32. Ng1 Kg7 33. Rxb7 Nf5 34. Kxh2 Kh8 35. Nh3 Kg7 36. Rxc7 Qg6 37. Bd5 Qd6+ 38. Nf4 Qxc7 39. Kh3 Qxf4 40. Bh1 Qg3# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "19"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 e6 2. Nc3 d5 3. e4 d4 4. Nb5 Nf6 5. e5 Ng4 6. h3 Nxe5 7. Nxe5 a6 8. Qf3 f5 9. Na3 Bd6 10. Qh5+ g6 11. Nxg6 Nc6 12. Ne5+ Ke7 13. Qf7# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "7"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. Nf3 d5 2. d4 c6 3. Bf4 Qb6 4. Nc3 Bf5 5. Na4 Qa5+ 6. c3 Nf6 7. Nc5 Ne4 8. Nxb7 Qb6 9. Qb3 Nd7 10. Ne5 Nxe5 11. Bxe5 Bd7 12. f3 Nd6 13. Nc5 Nc4 14. Bg3 e6 15. Nxd7 Qxb3 16. axb3 Na5 17. Nc5 Bxc5 18. Rxa5 Bb6 19. Ra6 h5 20. Bd6 Kd7 21. Bf4 Bc7 22. Bxc7 Kxc7 23. e3 e5 24. dxe5 c5 25. Bd3 Rhe8 26. Kf2 Reb8 27. Rha1 Kd8 28. Rd6+ Ke7 29. Rxd5 a5 30. Rxc5 Rxb3 31. Rc7+ Kd8 32. Rxf7 g5 33. Rf8+ Kd7 34. Rxa8 Rxb2+ 35. Kg3 g4 36. Ra7+ Kc8 37. Ba6+ Rb7 38. Ra8+ Kd7 39. Bxb7 Ke7 40. Rh8 gxf3 41. Rg8 f2 42. Rh8 Kd7 43. Rg8 Kc7 44. Rh8 f1=Q 45. Rh7+ Kd8 46. Rh8+ Kc7 47. Rh7+ Kd8 48. Rh8+ Kc7 49. Rh7+ Kd8 50. Rh8+ Kc7 51. Rh7+ Kd8 52. Rxf1 h4+ 53. Kxh4 Ke8 54. Rh8+ Ke7 55. Rg8 Kd7 56. Rh8 a4 57. Rg8 Kc7 58. Rh8 a3 59. Rg8 Kxb7 60. Rh8 a2 61. Rg8 Kc6 62. Rh8 a1=Q 63. Rc8+ Kb7 64. Rb8+ Kc6 65. Rc8+ Kd7 66. Rd8+ Kc7 67. Rc8+ Kxc8 68. Rxa1 Kd7 69. Kh5 Kc7 70. Kh6 Kb7 71. Kh7 Kc6 72. Kh8 Kb5 73. Kg8 Kc5 74. Kh8 Kc6 75. Kg8 Kc7 76. Kh8 Kd7 77. Kg8 Ke6 78. Kh8 Kf7 79. Kh7 Ke7 80. Kh8 Kd7 81. Kg8 Ke7 82. Kh8 Kd7 83. Kg8 Kc6 84. Kh8 Kd7 85. Kg8 Kc7 86. Kf8 Kc6 87. Kg8 Kc7 88. Kf8 Kc8 89. Kg8 Kc7 90. Kf8 Kc6 91. Ke8 Kc5 92. Kf8 Kc6 93. Ke8 Kd5 94. Kf8 Kc6 95. Ke8 Kd5 96. Kd8 Ke4 97. Ke8 Kd5 98. Kd8 Ke6 99. Ke8 Kd5 100. Kd8 Ke4 101. Kc8 Kxe3 102. Kd8 Kf2 103. Ke8 Ke3 104. Kf8 Kd3 105. Kg8 Ke3 106. Kh8 Kd3 107. Kg8 Kc2 108. Kh8 Kxc3 109. Kg8 Kc2 110. Kh8 Kb3 111. Kg8 Kc3 112. Kh8 Kd4 113. Kg8 Ke3 114. Kh8 Ke2 115. Kg8 Kf2 116. Kh8 Kxg2 117. Kg8 Kf2 118. Kh8 Kf3 119. Kg8 Kf2 120. Kh8 Kg2 121. Kg8 Kf2 122. Kh8 Kg2 123. Kg8 Kf2 124. Kh8 Kg2 125. Kh7 Kf3 126. Kg7 Kf4 127. Kh8 Kf3 128. Kh7 Kg2 129. Kh8 Kf3 130. Kh7 Ke3 131. Kh8 Kf3 132. Kh7 Kg2 133. Kg7 Kf3 134. Kf8 Kf2 135. Kg8 Ke2 136. Kf8 Kd2 137. Kg8 Kc3 138. Kh8 Kb2 139. Kg8 Kb3 140. Kh8 Kb4 141. Kg8 Kb3 142. Kh8 Kc4 143. Kg8 Kb3 144. Kh8 Kb2 145. Kg8 Kb3 146. Kh8 Kb2 147. Kh7 Kb3 148. Kg8 Kb4 149. Kh8 Kb5 150. Kg8 Kb4 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "14"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. d4 Nf6 2. Nf3 e6 3. c4 c5 4. e3 Be7 5. Nc3 O-O 6. Bd3 d5 7. b3 cxd4 8. exd4 Bb4 9. Bb2 Qa5 10. Qc2 Nc6 11. Rc1 dxc4 12. bxc4 e5 13. dxe5 Nxe5 14. Nxe5 Qxe5+ 15. Kf1 Rd8 16. Nd5 Qd6 17. Nxb4 Qxb4 18. Bxf6 gxf6 19. h4 Bg4 20. f3 Be6 21. g4 Rac8 22. h5 Rxd3 23. Qxd3 Qb2 24. Qe3 Bxc4+ 25. Kg1 Rd8 26. Rh2 Qd4 27. Qxd4 Rxd4 28. h6 b5 29. Rh5 Kf8 30. Rc5 f5 31. Rxf5 Rd6 32. g5 a6 33. Rf6 Rd5 34. Kf2 Rd2+ 35. Kg3 Rxa2 36. Rb6 Ke7 37. Rb8 Ke6 38. Kf4 Rd2 39. Re1+ Kd7 40. Ra8 b4 41. Rc1 Bb5 42. Rb1 Rd4+ 43. Ke5 Rc4 44. Ra7+ Ke8 45. Re1 Rc6 46. Kd5+ Kd8 47. Ree7 Rc1 48. g6 Rd1+ 49. Kc5 Rc1+ 50. Kxb4 Rc4+ 51. Ka5 fxg6 52. Rxh7 Bc6 53. Rh8+ Be8 54. h7 Rc5+ 55. Kb4 Rb5+ 56. Kc3 Rc5+ 57. Kb4 Rb5+ 58. Ka4 Rh5+ 59. Rxe8+ Kxe8 60. Kb4 a5+ 61. Kb3 a4+ 62. Kxa4 Rh4+ 63. Kb5 Rh5+ 64. Kb4 Rh4+ 65. Kc5 Rh5+ 66. Kd4 Rh4+ 67. Ke5 Rh5+ 68. Kf6 Kd8 69. Kxg6 Rh4 70. f4 Rg4+ 71. Kh5 Ke8 72. h8=Q+ Rg8 73. Qxg8# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "4"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. d4 Nf6 2. c3 Nc6 3. Nf3 e6 4. Bf4 Be7 5. h4 Rb8 6. a4 Bd6 7. Bg5 h6 8. Bxf6 Qxf6 9. e4 Qd8 10. Bd3 Be7 11. Qe2 d6 12. e5 O-O 13. Nbd2 Kh8 14. Rg1 a6 15. O-O-O Bd7 16. g4 dxe5 17. Bc2 exd4 18. Nb3 Bd6 19. Nbxd4 Bf4+ 20. Kb1 Nxd4 21. Nxd4 Qxh4 22. Qe4 f5 23. Qxf4 Qe7 24. Qxc7 fxg4 25. Nf3 Rbc8 26. Qxd7 Qxd7 27. Rxd7 Rxf3 28. Rxg4 Rg8 29. Rb4 Rxf2 30. Bd3 b5 31. axb5 axb5 32. Rxb5 Rf4 33. Rc5 Rb8 34. b4 Rg8 35. Kc2 Ra8 36. Rdc7 Rf2+ 37. Kb3 Rd8 38. Be4 Rf4 39. Bc6 Kg8 40. Rd7 Rxd7 41. Bxd7 Kf8 42. Bxe6 Ke7 43. Bc4 Kd6 44. Ra5 Rf6 45. Bg8 Rf1 46. Kc4 Kc7 47. Bd5 Kb6 48. Kb3 Kc7 49. Ra6 Re1 50. c4 Re3+ 51. Kc2 Re2+ 52. Kd3 Re1 53. Kc2 h5 54. Rg6 Kd8 55. Rg3 Re7 56. Rd3 g5 57. Rd1 g4 58. Kc3 h4 59. Kb2 Re2+ 60. Kc1 Kc7 61. Rf1 h3 62. Rh1 Kd6 63. b5 Kc5 64. Kb1 h2 65. Ba8 g3 66. Bd5 Rf2 67. Ka1 Kd4 68. Kb1 Kc5 69. b6 Kxb6 70. Be4 Kc5 71. Rc1 Kb4 72. Rc2 Kb3 73. Bf5 Rxf5 74. Rb2+ Kxc4 75. Rc2+ Kd5 76. Rc1 Rf8 77. Rc5+ Ke6 78. Rc1 Rh8 79. Kb2 Rg8 80. Re1+ Kf7 81. Rh1 Rh8 82. Kc3 Rg8 83. Kd3 Rh8 84. Rc1 Rg8 85. Rc4 Rh8 86. Rc7+ Kg8 87. Rc8+ Kh7 88. Rc3 Rg8 89. Kd4 Rd8+ 90. Ke3 Rg8 91. Rc4 Re8+ 92. Kf3 h1=Q+ 93. Kxg3 Re4 94. Rc5 Kg7 95. Rf5 Kh7 96. Kf2 Kh6 97. Rd5 Rf4+ 98. Ke3 Qxd5 99. Kxf4 Kh7 100. Kg3 Kh8 101. Kh4 Kg8 102. Kg3 Kh8 103. Kh3 Kg8 104. Kh4 Kh8 105. Kg3 Kg8 106. Kh2 Kh8 107. Kg3 Kg8 108. Kf2 Kh8 109. Kg3 Kg8 110. Kf4 Kh8 111. Kg3 Kg8 112. Kh4 Kf8 113. Kg4 Kg8 114. Kh4 Kf8 115. Kg3 Ke8 116. Kf2 Kf8 117. Kf1 Kg8 118. Ke1 Kh8 119. Kf1 Kg8 120. Ke1 Kh8 121. Kf2 Kg8 122. Ke1 Kh8 123. Kf1 Kg8 124. Ke1 Kh8 125. Kf1 Kh7 126. Ke2 Kh8 127. Ke3 Kg8 128. Kf2 Kf8 129. Ke3 Kg8 130. Ke2 Kh8 131. Kf1 Kh7 132. Kf2 Kg7 133. Kf1 Kh8 134. Ke2 Kh7 135. Ke3 Kh8 136. Kf2 Kh7 137. Kf1 Kh8 138. Kf2 Kh7 139. Ke3 Kh8 140. Kf2 Kh7 141. Kf1 Kg7 142. Ke2 Kf8 143. Kf2 Ke8 144. Ke3 Kf8 145. Ke2 Ke8 146. Kf1 Kf8 147. Kf2 Ke8 148. Ke3 Kf8 149. Kf2 Ke8 150. Kf1 Kf8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "13"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 c5 2. e4 e6 3. Be2 Nf6 4. e5 Ng8 5. Nc3 Nc6 6. Nb5 a6 7. Nd6+ Bxd6 8. exd6 Qf6 9. d4 Nxd4 10. Nxd4 Qxd4 11. Be3 Qxb2 12. O-O Qc3 13. Rb1 Nf6 14. Bf3 Rb8 15. Bd2 Qe5 16. Rb6 c4 17. Be3 Qf5 18. g4 Qg6 19. Qd4 Ra8 20. g5 h6 21. Bxb7 Bxb7 22. Rxb7 hxg5 23. Ra7 Rc8 24. Rc7 Ra8 25. Rc5 Rh4 26. Qe5 Kf8 27. f3 g4 28. Qg3 Rh8 29. Rxc4 Rh3 30. Qg2 gxf3 31. Qxg6 fxg6 32. Rf4 Kf7 33. Bd2 Rah8 34. Rf2 e5 35. R4xf3 Ke6 36. Be1 g5 37. Rxh3 Rxh3 38. Re2 g6 39. Bg3 Ng4 40. Re4 Kf5 41. Rc4 Rh7 42. a4 Ne3 43. Rc3 Ke4 44. Rc5 Ng4 45. Rc4+ Kf3 46. Rc8 a5 47. Rc5 Rh8 48. Bxe5 Re8 49. Rc3+ Ke2 50. Bd4 Re6 51. Bc5 Nf6 52. Bd4 Nd5 53. Rc8 Nf4 54. Bb6 g4 55. Rf8 g5 56. Bxa5 Nh3+ 57. Kg2 Nf4+ 58. Kh1 Rxd6 59. Re8+ Kf3 60. Re1 g3 61. Rf1+ Ke2 62. Rg1 Ra6 63. Bc3 g2+ 64. Rxg2+ Nxg2 65. Kxg2 Rc6 66. Bd4 Rxc2 67. Bg7 Ra2 68. Bf6 Rxa4 69. Kg3 g4 70. Be5 d5 71. Kh4 Ke3 72. Bf6 Kf3 73. Kh5 d4 74. Bg5 d3 75. Kg6 Ra2 76. Kh7 Rc2 77. Kg6 Rxh2 78. Kg7 Ke4 79. Kg8 Kf5 80. Kf8 g3 81. Kg8 Rb2 82. Kh8 Rh2+ 83. Kg8 Rh1 84. Kf8 Ra1 85. Kg8 Ra4 86. Kh8 g2 87. Kg8 Rb4 88. Kh8 Ra4 89. Kg8 g1=Q 90. Kh8 Re4 91. Kg8 Ra4 92. Kh8 Re4 93. Kg8 Ke6 94. Kh8 Qxg5 95. Kh7 d2 96. Kh8 Rh4# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "17"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 e6 2. Nc3 d5 3. e4 d4 4. Nb5 c5 5. e5 Nh6 6. b4 a6 7. Nd6+ Bxd6 8. exd6 Qxd6 9. Bb2 b6 10. Be2 Bb7 11. O-O Nd7 12. Rc1 Nf5 13. Bd3 Ne7 14. Re1 Bxf3 15. Qxf3 O-O 16. Qh3 Ng6 17. Bxg6 hxg6 18. Re4 a5 19. Rh4 f6 20. bxc5 bxc5 21. Re1 Qd5 22. c4 Qf5 23. g4 Qf4 24. Bxd4 cxd4 25. Rxe6 Ne5 26. Rxe5 fxe5 27. Rh8+ Kf7 28. Rxf8+ Rxf8 29. Qg2 e4 30. g5 Qf3 31. h3 d3 32. Kh2 Ke6 33. Kh1 Qf5 34. Kg1 Qf3 35. Qf1 Qf5 36. Qg2 Rb8 37. Qf1 Qe5 38. Qd1 Qxg5+ 39. Kh1 Qh4 40. Kg1 Qg5+ 41. Kh1 Qh5 42. Qf1 Qf5 43. Kg2 Rf8 44. Kg1 Qf3 45. Qe1 Qe2 46. Qf1 e3 47. dxe3 Kf6 48. Kg2 Rd8 49. Qb1 Rf8 50. Qb6+ Kf7 51. Qxa5 Qh5 52. Qa7+ Kg8 53. Qb7 d2 54. Qc8 Qf3+ 55. Kh2 Qxf2+ 56. Kh1 d1=R# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "22"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. e5 d5 6. Be2 Ne4 7. Nbd2 Bb4 8. Bb5 O-O 9. O-O Nxd2 10. Nxd2 Nxe5 11. h3 Qh4 12. a3 Bd6 13. Nf3 Nxf3+ 14. Kh1 Bxh3 15. gxf3 Rfe8 16. Bxe8 Rxe8 17. Re1 Bc8+ 18. Kg2 Bh3+ 19. Kg1 Re7 20. Bd2 Bg3 21. fxg3 Qxg3+ 22. Kh1 Qg2# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "15"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 e6 2. Nc3 Bb4 3. e4 d5 4. exd5 exd5 5. a3 Ba5 6. Qe2+ Ne7 7. d4 O-O 8. Bd2 Nf5 9. O-O-O Bxc3 10. Bxc3 Re8 11. Qd2 Nc6 12. Ne5 Nd6 13. Bd3 Ne7 14. Bb4 Bf5 15. Bxd6 cxd6 16. Nf3 Rc8 17. Ng5 h6 18. Nh3 Kf8 19. Rhe1 Bg4 20. Nf4 Qd7 21. f3 Be6 22. Nh5 Kg8 23. Qxh6 gxh6 24. Nf6+ Kg7 25. Nxd7 Red8 26. Ne5 dxe5 27. Rxe5 Ng6 28. Bxg6 Kxg6 29. Re3 Rh8 30. Rd2 Rhg8 31. Rb3 Rb8 32. Re3 Kf6 33. Rde2 h5 34. Re5 Rh8 35. g3 Rbd8 36. Rf2 h4 37. g4 Rd6 38. h3 Bd7 39. f4 a6 40. Rf3 Bb5 41. g5+ Kg6 42. f5+ Kxg5 43. f6+ Kh6 44. Re7 Rf8 45. Rxb7 Bd7 46. Ra7 Rg8 47. Rb7 Rg1+ 48. Kd2 Kg6 49. Rb8 Rxf6 50. Rg8+ Kh7 51. Rxf6 Kxg8 52. Rf4 Bxh3 53. Rxh4 Bd7 54. Rh5 Rg2+ 55. Ke3 Be6 56. b3 f6 57. Kd3 Rg3+ 58. Kd2 Kg7 59. Rh1 Bf5 60. Rh2 Kg6 61. Re2 Be4 62. Rh2 Kg7 63. a4 a5 64. Rf2 Kg6 65. Rh2 Kg7 66. Rf2 Kg6 67. Rh2 f5 68. Rh8 f4 69. Rg8+ Kh5 70. Rh8+ Kg5 71. Rg8+ Kh5 72. Rh8+ Kg5 73. Rg8+ Kf5 74. Rf8+ Kg4 75. Rg8+ Kf3 76. Rc8 Kg4 77. Rg8+ Kh4 78. Rh8+ Bh7 79. Rxh7+ Kg4 80. b4 Ra3 81. Rg7+ Kf5 82. b5 Ke4 83. b6 Rxa4 84. b7 Rb4 85. Re7+ Kf5 86. Re5+ Kg4 87. Re7 Kf3 88. Rc7 a4 89. Kc3 Rb1 90. Kd3 Rb4 91. Kc3 Rb1 92. Kd3 a3 93. Rg7 Rb6 94. Kd2 a2 95. Rg1 Rb1 96. Rxb1 axb1=Q 97. Kd3 Qxb7 98. Kc3 Kf2 99. Kd3 Qb1 100. Kc3 Ke1 101. Kd3 Qc1 102. Kc3 Qa3# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "23"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 c6 2. e4 d5 3. Nc3 dxe4 4. Nxe4 Bf5 5. Nc5 b6 6. Na4 e6 7. Nc3 Bb4 8. a3 Bxc3 9. dxc3 Nf6 10. Qxd8+ Kxd8 11. Ne5 Ke7 12. Bg5 Bxc2 13. a4 h6 14. Bxf6+ gxf6 15. Bd3 fxe5 16. Bxc2 Nd7 17. a5 b5 18. h4 f5 19. Rh3 Rag8 20. Kf1 Rg4 21. Bd1 Rf4 22. Be2 Rf8 23. Rd1 Ra4 24. b3 Rxa5 25. b4 Ra6 26. Rg3 Nf6 27. Rg7+ Ke8 28. c4 Rf7 29. Rxf7 Kxf7 30. cxb5 cxb5 31. Bxb5 Rb6 32. Be2 Rxb4 33. Ra1 a5 34. g3 a4 35. Bd1 Ne4 36. Rxa4 Rb1 37. Ra7+ Kf6 38. Rd7 Nc5 39. Rd8 Ne4 40. Kg2 Rb2 41. Rf8+ Kg7 42. Ra8 Kf6 43. Ra3 Nxf2 44. Bf3 Ne4+ 45. Kh3 Nd2 46. Ba8 h5 47. Ra6 Ke7 48. Ra7+ Kf8 49. Ra6 Ke7 50. Ra7+ Kf6 51. Rh7 e4 52. Rh6+ Kg7 53. Rxe6 Nf1 54. Re7+ Kf8 55. Re8+ Kxe8 56. Bc6+ Kd8 57. Be8 Ke7 58. Bf7 Kxf7 59. g4 Rh2# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "16"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Be7 5. O-O O-O 6. a4 Rb8 7. d4 Nxd4 8. Re1 Nxf3+ 9. Qxf3 d6 10. Nd5 Nxd5 11. Bh6 Nf6 12. Qg3 Ng4 13. Be3 Nxe3 14. fxe3 Bh4 15. Qf3 Bxe1 16. Rxe1 Qg5 17. Qd1 Bg4 18. Qd3 Bf3 19. Qd2 Bxe4 20. Bd3 Bxd3 21. Qf2 Be4 22. Rf1 b5 23. h3 bxa4 24. c4 Rb3 25. c5 dxc5 26. Kh2 Qxe3 27. Qe1 Qxe1 28. Rxe1 Rxb2 29. Rxe4 c4 30. Re3 Rd8 31. Rxe5 Rb6 32. Kg1 Rb1+ 33. Kh2 c3 34. g4 Kh8 35. Rd5 Rg8 36. Kg2 Re8 37. Kg3 Kg8 38. Rc5 a3 39. Rxc3 a2 40. Rc2 Re3+ 41. Kf2 Ra3 42. Rc1 Kh8 43. Rh1 Kg8 44. Rxb1 Rf3+ 45. Kg2 Rg3+ 46. Kh1 Rxh3+ 47. Kg2 Rg3+ 48. Kf2 Rf3+ 49. Kg1 Rg3+ 50. Kf2 Rf3+ 51. Kg2 Rg3+ 52. Kf2 Rf3+ 53. Kxf3 axb1=Q 54. g5 Kh8 55. Kg3 Kg8 56. Kf2 Kh8 57. Kg2 Kg8 58. Kf2 Kh8 59. Ke3 Kg8 60. Kf2 Kh8 61. Kg2 Kg8 62. Kf2 Kh8 63. Kg2 Qb8 64. Kh3 Kg8 65. Kg2 Kh8 66. Kf3 Kg8 67. Kf2 Kh8 68. g6 Kg8 69. gxh7+ Kh8 70. Kg1 Kxh7 71. Kh1 Qh8 72. Kh2 Qg8 73. Kg2 Qh8 74. Kg3 Qg8 75. Kf2 Qh8 76. Kf1 Qg8 77. Ke1 Qh8 78. Kd1 Qg8 79. Kc1 Qh8 80. Kd1 Qg8 81. Kc1 Qh8 82. Kd1 Qg8 83. Kc1 Qh8 84. Kd1 Qg8 85. Kc1 Qf8 86. Kd1 Qh8 87. Ke2 Qg8 88. Ke3 Qh8 89. Kf3 Qg8 90. Kg2 Qh8 91. Kf2 Qg8 92. Kg2 Qh8 93. Kh1 Qg8 94. Kg2 Qh8 95. Kf1 Qf8 96. Ke1 Qg8 97. Kd2 Qf8 98. Ke3 Qh8 99. Kd3 Qg8 100. Kc3 Qh8 101. Kb2 Qf8 102. Kc3 Qh8 103. Kb2 Qf8 104. Ka1 Qh8 105. Kb2 Qf8 106. Kc2 Qe8 107. Kc3 Qh8 108. Kb2 Qf8 109. Ka1 Qg8 110. Ka2 Qf8 111. Ka1 Qg8 112. Ka2 Qf8 113. Ka1 Qg8 114. Ka2 Qe8 115. Ka1 Qg8 116. Ka2 Qe8 117. Kb2 Qh8 118. Kc3 Qg8 119. Kd2 Qf8 120. Kc2 Qe8 121. Kd3 Qh8 122. Kc3 Qg8 123. Kb3 Qf8 124. Kc2 Qe8 125. Kd1 Qh8 126. Ke2 Qg8 127. Kd3 Qh8 128. Kc4 Qg8 129. Kb4 Qh8 130. Ka4 Qg8 131. Ka5 Qh8 132. Kb5 Qg8 133. Ka5 Qh8 134. Kb4 Qg8 135. Ka4 Qh8 136. Ka5 Qg8 137. Ka4 Qh8 138. Ka5 Qg8 139. Ka4 Qh8 140. Kb5 Qg8 141. Ka6 Qh8 142. Ka5 Qg8 143. Ka4 Qh8 144. Kb5 Qf8 145. Kc4 g6 146. Kb5 Qh8 147. Kb4 Qg8 148. Kc5 Qh8 149. Kc4 Qg8 150. Kd3 Qh8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "21"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 c6 2. e4 a6 3. d4 d5 4. Ne5 Nd7 5. Nxd7 Bxd7 6. Be2 Rc8 7. Nc3 dxe4 8. Nxe4 Qc7 9. Nc5 Bf5 10. Be3 Bg6 11. c3 Nf6 12. Qb3 Rb8 13. a4 h6 14. h4 Bf5 15. a5 Nd5 16. Bd2 e5 17. c4 Nf6 18. Qg3 h5 19. O-O Bxc5 20. Qxg7 Rg8 21. Qxf6 Bh3 22. Bg5 Be7 23. Qxe5 Rxg5 24. Qxc7 Bd8 25. Qxb8 Rxg2+ 26. Kh1 Kd7 27. Qxb7+ Bc7 28. Bf3 Rg6 29. Rfe1 f6 30. Qa8 Be5 31. Qh8 Ke6 32. Qf8 Kd7 33. Qh8 Rg4 34. Qf8 Bg2+ 35. Bxg2 Rxg2 36. Qf7+ Kd8 37. Qf8+ Kd7 38. Qf7+ Kc8 39. Qf8+ Kd7 40. Qf7+ Kd6 41. c5# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "26"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Nf6 5. Qd3 Bc5 6. Nxc6 dxc6 7. f3 Qe7 8. Bg5 O-O 9. Qe2 Qe5 10. Bxf6 Qxf6 11. e5 Qh4+ 12. g3 Qg5 13. Nd2 Re8 14. Nc4 f6 15. a3 Be6 16. f4 Qg6 17. Qd3 Bf5 18. Qc3 Rad8 19. Ne3 Bxe3 20. Qxe3 Be4 21. Bc4+ Bd5 22. Bd3 Qh5 23. Be2 Qh6 24. O-O fxe5 25. Rae1 exf4 26. Qc1 Qh3 27. Bh5 Qg2# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "18"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. c4 Nf6 2. e3 e5 3. Nf3 e4 4. Ng1 d5 5. cxd5 Nxd5 6. Qa4+ Nc6 7. Qxe4+ Be7 8. Nf3 O-O 9. Nc3 Be6 10. d4 Ncb4 11. Qb1 g6 12. e4 Re8 13. Nxd5 Bxd5 14. exd5 Bf8+ 15. Be2 Qe7 16. Ne5 f6 17. Bb5 a6 18. Bxe8 Rxe8 19. a3 Nxd5 20. Qa2 Qe6 21. f4 fxe5 22. dxe5 g5 23. Bd2 gxf4 24. O-O Kh8 25. Qb3 b6 26. Rae1 Bh6 27. Qf3 Rg8 28. Kh1 Rf8 29. Qe4 c6 30. g3 fxg3 31. Rxf8+ Bxf8 32. Rg1 Ne7 33. Rxg3 Bg7 34. Qd3 Ng6 35. Qe4 Kg8 36. Rf3 Nxe5 37. Rg3 Kf7 38. Rg2 Ng6 39. Qf3+ Kg8 40. Bc3 Bxc3 41. bxc3 Kg7 42. Qd3 Qd5 43. Qxd5 cxd5 44. Rf2 Ne5 45. Rf5 Nc4 46. Rxd5 Nxa3 47. Rd6 Nb5 48. Rc6 Kf7 49. c4 Na3 50. Rxb6 Nxc4 51. Rb4 Nd6 52. Rb6 Ke6 53. Rb4 Nb5 54. Rc4 Kd7 55. Rh4 h5 56. Rxh5 Ke7 57. Kg2 Kf6 58. Rc5 Nd4 59. Rd5 Nb5 60. h4 Nc7 61. Rd4 Ne6 62. Rd6 a5 63. Kh3 a4 64. Ra6 Kf7 65. Kg4 Nc5 66. Ra5 Ne6 67. Ra6 Nc5 68. Ra8 Kf6 69. h5 Kg7 70. Ra7+ Kh6 71. Ra5 Nd7 72. Ra6+ Kh7 73. Ra7 Kg8 74. Kh4 Nc5 75. h6 Ne6 76. Re7 Nc5 77. Ra7 Ne6 78. Kg4 Kh8 79. Ra6 Nc5 80. Ra7 Ne6 81. Ra6 Nc5 82. Ra8+ Kh7 83. Rc8 Ne4 84. Rc4 Nd6 85. Rxa4 Nb5 86. Kh5 Kh8 87. Ra2 Kh7 88. Ra4 Kh8 89. Rc4 Kh7 90. Rc8 Nd6 91. Rc7+ Kg8 92. Rg7+ Kf8 93. Kg6 Ke8 94. Kf6 Kf8 95. Ra7 Kg8 96. Re7 Kh8 97. Kg6 Kg8 98. Ra7 Kh8 99. Ra8+ Ne8 100. Rd8 Kg8 101. h7+ Kf8 102. h8=R+ Ke7 103. Rhxe8# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "20"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. e3 Nf6 2. c4 e5 3. a3 Be7 4. Be2 O-O 5. d3 c6 6. Nc3 d5 7. Nf3 d4 8. Ne4 Nxe4 9. dxe4 dxe3 10. Qxd8 exf2+ 11. Kd1 Rxd8+ 12. Kc2 Nd7 13. Bg5 Bxg5 14. Rad1 Be7 15. Rd3 f5 16. Nd2 b6 17. c5 fxe4 18. Nxe4 Nxc5 19. Rd2 Nxe4 20. Rxd8+ Bxd8 21. Bd3 Nc5 22. Rb1 Nxd3 23. Kxd3 Ba6+ 24. Ke3 Bh4 25. Rc1 Kh8 26. g3 Rf8 27. Ke4 Kg8 28. gxh4 Kh8 29. Ra1 Kg8 30. Rh1 Kh8 31. Ke3 Kg8 32. Rf1 Bxf1 33. b4 Kh8 34. b5 Kg8 35. h5 Kh8 36. Kd2 Kg8 37. bxc6 Kh8 38. c7 Kg8 39. Kc3 Kh8 40. Kb3 Kg8 41. Kb2 Kh8 42. Kc1 Kg8 43. h6 Kh8 44. Kd2 Kg8 45. Kc3 Kh8 46. a4 Kg8 47. a5 Kh8 48. Kb4 Kg8 49. Ka3 Kh8 50. hxg7+ Kxg7 51. a6 Rh8 52. Kb4 Rg8 53. c8=R Rxc8 54. Kb3 Rh8 55. Ka4 Rg8 56. Kb3 Rh8 57. Ka3 Rg8 58. h3 Rh8 59. Ka4 Rg8 60. h4 Rh8 61. Ka3 Rg8 62. Kb3 Rh8 63. h5 Rg8 64. Kc3 Rh8 65. Kd2 Rg8 66. Ke3 Rh8 67. Kd2 Rg8 68. Kd1 Rh8 69. Kd2 Rg8 70. Kd1 Rh8 71. Kd2 Rg8 72. Kd1 Rf8 73. Kc1 Rg8 74. Kd1 Rf8 75. Kc1 Re8 76. Kd2 Rh8 77. h6+ Kg8 78. Kc3 Kf8 79. Kb3 Rg8 80. Ka3 Rh8 81. Ka4 Rg8 82. Kb3 Rh8 83. Ka2 Rg8 84. Ka1 Rh8 85. Kb2 Rg8 86. Kb3 Rh8 87. Ka4 Rg8 88. Kb3 Rh8 89. Ka4 Rg8 90. Kb3 Rh8 91. Ka4 Kg8 92. Kb3 Kf7 93. Kb2 Rg8 94. Ka3 Rh8 95. Ka2 Rg8 96. Kb3 Rh8 97. Ka3 Rg8 98. Kb4 Rh8 99. Kc3 Rg8 100. Kc2 Rh8 101. Kd1 Rg8 102. Kc1 Rh8 103. Kd1 Rg8 104. Kc2 Rh8 105. Kd1 Rg8 106. Kc2 Rh8 107. Kd1 Rg8 108. Kc2 Rf8 109. Kb3 Rh8 110. Kb4 Rg8 111. Kb3 Rh8 112. Kb4 Rg8 113. Kb3 Rf8 114. Kc3 Rh8 115. Kb4 Rg8 116. Kb3 Rf8 117. Ka4 Rh8 118. Kb4 Rf8 119. Kb3 Re8 120. Kb2 Rh8 121. Kb1 Rf8 122. Ka1 Rh8 123. Ka2 Rf8 124. Kb3 Re8 125. Ka2 Rh8 126. Kb2 Rf8 127. Kb1 Rh8 128. Kb2 Rf8 129. Ka2 Rh8 130. Ka3 Rf8 131. Kb4 Rh8 132. Ka4 Rf8 133. Kb4 Rh8 134. Ka4 Rf8 135. Kb3 Re8 136. Ka3 Rd8 137. Ka4 Re8 138. Ka3 Rd8 139. Kb3 Rf8 140. Kc3 Re8 141. Kb3 Rf8 142. Ka3 Re8 143. Ka4 Rd8 144. Kb4 Rh8 145. Kc3 Re8 146. Kb3 Rd8 147. Ka3 Re8 148. Ka4 Rd8 149. Ka3 Re8 150. Ka4 Rd8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "27"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 c5 2. e4 d6 3. Ng5 e5 4. Bb5+ Nc6 5. Qh5 g6 6. Qh4 Qf6 7. Nc3 Be7 8. Nd5 Qxg5 9. Qxg5 Bxg5 10. Nc7+ Kd7 11. Nxa8 Nf6 12. h4 Bh6 13. f3 Bf4 14. Kf2 d5 15. g3 Kd6 16. gxf4 Nxe4+ 17. fxe4 Bd7 18. exd5 h6 19. dxc6 bxc6 20. fxe5+ Ke6 21. Nc7+ Ke7 22. Bc4 Kd8 23. Na6 Re8 24. d3 g5 25. hxg5 Bg4 26. Bxf7 Rf8 27. g6 Ke7 28. Nxc5 Rh8 29. Kg3 Bd1 30. Be6 Rf8 31. Bf7 Be2 32. Be6 Rf3+ 33. Kh4 Bf1 34. Bc8 a6 35. Bd7 a5 36. Bc8 Kd8 37. Bd7 Kc7 38. Be6 Kb6 39. Bc8 Kxc5 40. Bd7 Bg2 41. Rh2 Rxd3 42. Be6 Rc3 43. Bg8 a4 44. Bf7 Rxc2 45. Be6 Re2 46. Bg4 Kd4 47. Kg3 a3 48. Bf3 axb2 49. Bxb2+ Ke3 50. Bh5 Rxb2 51. Rxg2 Rc2 52. Bg4 Rc4 53. Bc8 Ra4 54. Bd7 Rc4 55. Be8 Rf4 56. Bf7 Rf5 57. Kh4 Rf2 58. Bd5 Rxg2 59. Bxg2 Kd2 60. Kh5 Kd3 61. Kxh6 c5 62. Kh7 Kc3 63. Kh8 Kb2 64. Kg8 Kc3 65. Kh8 Kb2 66. Kg8 Kxa1 67. Kh8 c4 68. Kg8 Kb2 69. Kh8 c3 70. Kh7 Ka3 71. Kh6 c2 72. g7 c1=Q+ 73. Kh7 Qc7 74. e6 Qc2+ 75. Kh6 Qxg2 76. e7 Qh2+ 77. Kg6 Qc2+ 78. Kg5 Qd2+ 79. Kg6 Qd3+ 80. Kf6 Qa6+ 81. Ke5 Qc8 82. Kd6 Kb4 83. a3+ Ka4 84. Ke5 Qg8 85. Kd6 Qe8 86. Ke6 Qg6+ 87. Kd7 Qf5+ 88. Kc7 Qf7 89. Kd6 Qe8 90. Ke6 Qc8+ 91. Kd6 Kxa3 92. Ke5 Kb4 93. Kd6 Qe8 94. g8=Q Qxg8 95. Kd7 Qg7 96. Ke8 Kc5 97. Kd8 Kc6 98. e8=Q+ Kd6 99. Qa4 Qe7+ 100. Kc8 Qc7# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "25"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. Nf3 c6 2. e4 Nf6 3. e5 Nd5 4. d4 g6 5. c4 Nb6 6. Nc3 d5 7. exd6 Bf5 8. c5 Nc8 9. Qb3 exd6 10. Qxb7 Qe7+ 11. Qxe7+ Bxe7 12. Be3 O-O 13. Rg1 dxc5 14. dxc5 Nd7 15. Nd4 Re8 16. g4 Be6 17. Nxe6 Bf6 18. Nc7 Rxe3+ 19. fxe3 Bh4+ 20. Kd2 Ne5 21. Nxa8 Nf3+ 22. Kc2 Nxg1 23. Ba6 Bf2 24. Kd3 Nf3 25. Ke2 h5 26. Kxf3 Nd6 27. cxd6 Kf8 28. Kxf2 f6 29. Nc7 Kf7 30. Na8 f5 31. Nc7 fxg4 32. Na8 c5 33. Nc7 h4 34. Ne8 Kxe8 35. Bb5+ Kf8 36. Bd7 g3+ 37. Kf3 Kg7 38. Be8 gxh2 39. Bxg6 a6 40. Be8 Kf8 41. Bd7 h3 42. Bc8 Kf7 43. Bd7 Kg7 44. Be8 Kf6 45. Bd7 Kg5 46. Be8 h1=R 47. Ne4+ Kh4 48. Rxh1 c4 49. Bf7 a5 50. Bg8 Kh5 51. Bh7 Kh6 52. Bg8 h2 53. Bh7 a4 54. Bg8 Kg6 55. Bh7+ Kh6 56. Bg8 c3 57. Bh7 c2 58. Bg8 Kg7 59. Bh7 c1=R 60. Rxc1 h1=Q+ 61. Rxh1 a3 62. Bg8 Kg6 63. Bh7+ Kf7 64. Bg8+ Kxg8 65. Nf6+ Kf8 66. Ng8 Ke8 67. Ne7 axb2 68. Ng8 Kd7 69. Rd1 b1=N 70. Nf6+ Kc6 71. Ng4 Kb7 72. Nh6 Na3 73. Nf7 Kb6 74. Nh8 Kc6 75. Rd3 Nc4 76. d7 Ne5+ 77. Ke4 Ng4 78. Nf7 Nf6+ 79. Kf5 Nxd7 80. Ne5+ Kc7 81. Nxd7 Kc8 82. Nf8 Kb8 83. Nh7 Kb7 84. Nf8 Kb6 85. Nh7 Kc5 86. Nf8 Kb4 87. Nh7 Kc4 88. Nf8 Kxd3 89. e4 Ke2 90. Nh7 Kd3 91. Nf8 Kd4 92. Nh7 Kc4 93. Nf8 Kc3 94. Nh7 Kb2 95. Nf8 Kb1 96. Nh7 Kc1 97. Nf8 Kd2 98. Nh7 Kc3 99. Nf8 Kb2 100. Nh7 Kb1 101. Nf8 Kc2 102. Nh7 Kb2 103. Nf8 Kc3 104. Nh7 Kb2 105. Nf8 Kc3 106. Nh7 Kb2 107. Nf8 Kc3 108. Nd7 Kc2 109. Nb8 Kb1 110. Nd7 Kxa2 111. Nf8 Kb3 112. Nh7 Kb2 113. Nf8 Kb3 114. Nh7 Kc4 115. Nf8 Kb3 116. Nh7 Ka2 117. Nf8 Kb3 118. Nh7 Kc4 119. Nf6 Kd4 120. Ng8 Kc5 121. Nh6 Kd4 122. Ng8 Kc4 123. Ne7 Kd3 124. Ng8 Ke2 125. Ne7 Kf1 126. Ng8 Kg1 127. Ne7 Kh1 128. Ng8 Kh2 129. Ne7 Kh3 130. Ng8 Kg2 131. Ne7 Kg3 132. Ng8 Kf2 133. Ne7 Kf3 134. Ng8 Kf2 135. Ne7 Ke2 136. Ng8 Kf2 137. Ne7 Kf3 138. Ng8 Kf2 139. Ne7 Kf3 140. Nc8 Kg3 141. Ne7 Kf3 142. Nc8 Ke2 143. Na7 Ke3 144. Nc8 Kd4 145. Ne7 Kc3 146. Ng8 Kc2 147. Ne7 Kb1 148. Ng8 Ka2 149. Ne7 Ka3 150. Ng8 Kb2 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "30"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Bc4 Bb4+ 5. Bd2 Bxd2+ 6. Nbxd2 Nge7 7. O-O O-O 8. Nb3 d6 9. Qd2 Bg4 10. Nfxd4 Ne5 11. Qf4 c5 12. Ne2 Bd7 13. Bd5 c4 14. Nbd4 Qb6 15. Qd2 Rfc8 16. Nc3 Rc5 17. a4 Nxd5 18. Nxd5 Qd8 19. Rad1 Ng6 20. f4 Ne7 21. Nxe7+ Qxe7 22. Qe3 Re8 23. Rfe1 Rh5 24. Qg3 Qf6 25. Nf5 Bxf5 26. exf5 Rf8 27. Qf3 Rxf5 28. Qxb7 c3 29. bxc3 Qxc3 30. h3 Rxf4 31. Qe7 Qxc2 32. Qxd6 Rf2 33. Qxf8+ Kxf8 34. Rd8# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "24"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. e4 e5 2. Bc4 Nf6 3. Nf3 Nc6 4. Nc3 Be7 5. d4 exd4 6. Nd5 O-O 7. Bf4 d6 8. h3 Nxe4 9. O-O Be6 10. Bb3 Nc5 11. Nxe7+ Qxe7 12. Qd2 a5 13. Rfe1 Qf6 14. c3 dxc3 15. Qd1 cxb2 16. Bg5 bxa1=Q 17. Bxf6 Qxf6 18. Qc2 Nb4 19. Qb1 Bf5 20. Qxf5 Qxf5 21. Ba4 Nxa4 22. Re7 Kh8 23. g4 Qg6 24. Nh4 Qh6 25. Nf5 Qg6 26. Re1 Rg8 27. Kg2 Rgf8 28. Ne7 Qh6 29. Re2 Rfe8 30. a3 Rxe7 31. axb4 Kg8 32. Rxe7 axb4 33. Re2 Kh8 34. Kh2 Kg8 35. Rc2 Kh8 36. Ra2 Kg8 37. Kg1 Kh8 38. g5 Qg6 39. Ra3 Kg8 40. Re3 Kh8 41. f4 Kg8 42. h4 Kh8 43. Kg2 Kg8 44. f5 Qh5 45. Kh3 Kh8 46. Re7 Kg8 47. Rd7 Kh8 48. Kg3 Kg8 49. Rxc7 Kh8 50. Rxf7 Kg8 51. Rxb7 Re8 52. Rxb4 Re3+ 53. Kh2 Kf8 54. Rb7 Kg8 55. f6 Qe8 56. f7+ Qxf7 57. g6 Qf8 58. Ra7 Kh8 59. Rf7 Qg8 60. Kg2 Qe8 61. Rf1 Kg8 62. gxh7+ Kh8 63. Rb1 Kxh7 64. Kh2 Qh8 65. Kg2 Qg8 66. Kh2 Qh8 67. Ra1 Qg8 68. Rxa4 Qf8 69. Ra2 Qg8 70. Rb2 Qf8 71. Rg2 Qg8 72. Rg5 Qe8 73. Rf5 Qg6 74. Rg5 Qe8 75. Rf5 Qg6 76. Rf3 Qe8 77. Rf5 Qg6 78. Rf3 Qe8 79. Rf5 Qg6 80. Rf3 Qh6 81. Kg2 Kg8 82. Rf2 Qg6+ 83. Kf1 Kh7 84. Rf8 Qe6 85. Kg1 Kg6 86. Rh8 Kf7 87. Kf2 Ke7 88. Rh7 Kf7 89. Kg2 Kg8 90. Rh6 Qe8 91. Kg1 Kf7 92. h5 Qc8 93. Rg6 Qa8 94. Kf2 Qe4 95. Rxg7+ Kf8 96. Rg5 Kf7 97. Rg3 Qh4 98. Kf1 Qe7 99. Rg4 Qf6+ 100. Kg1 Kf8 101. Rc4 Kg7 102. Rg4+ Kh8 103. Rg6 Qf8 104. Rg2 Qc8 105. Kf2 Qa8 106. Rg5 Qe4 107. Rg3 Qh4 108. Kxe3 Qxg3+ 109. Kd4 Kg8 110. Kc4 Kh8 111. h6 Kg8 112. Kd5 Kh8 113. Ke6 Kg8 114. h7+ Kh8 115. Kd5 Kxh7 116. Ke6 Kh8 117. Kd5 Kg8 118. Kc4 Kh8 119. Kb4 Kg8 120. Ka5 Kh8 121. Kb6 Kg8 122. Kc6 Kh8 123. Kb6 Kg8 124. Kc6 Kh8 125. Kb6 Kg8 126. Kc6 Kh8 127. Kb6 Kg8 128. Kc6 Kf8 129. Kb7 Ke8 130. Kc6 Kf8 131. Kb5 Ke8 132. Kb6 Kf8 133. Kb5 Ke8 134. Kc4 Kf8 135. Kb5 Ke8 136. Kb4 Kf8 137. Kb5 Ke8 138. Kc4 Kd8 139. Kb4 Ke8 140. Kc4 Kd8 141. Kb5 Kc8 142. Kb4 Kd8 143. Kc4 Ke8 144. Kd5 Kf8 145. Ke4 Kg8 146. Kd5 Kh8 147. Ke6 Kg8 148. Ke7 Kh8 149. Kd7 Kh7 150. Kc8 Kh8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "32"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. c4 Nf6 2. d4 e6 3. Nf3 c5 4. e3 Be7 5. d5 exd5 6. Qb3 dxc4 7. Qa4 O-O 8. Bxc4 d5 9. Bb3 Bd7 10. Qh4 Ne4 11. Qh5 Nf6 12. Qg5 c4 13. Bd1 Nc6 14. Nc3 Nb4 15. Ne5 Ng4 16. Nxd7 Nd3+ 17. Kf1 Bxg5 18. Ba4 Ndxf2 19. Kg1 Re8 20. h3 Nxh1 21. Kxh1 Nf2+ 22. Kh2 d4 23. Kg1 Bh4 24. Bd2 dxc3 25. Bxc3 Qg5 26. Bc2 Nxh3+ 27. Kh1 Kh8 28. Bxg7+ Kxg7 29. gxh3 Rxe3 30. Bf5 Rh8 31. Rg1 Bg3 32. a3 Rg8 33. Be6 Rh8 34. a4 Rg8 35. Bxc4 Rd8 36. Bxf7 Rc8 37. Bc4 Rc7 38. a5 Kh8 39. Nf8 Rc8 40. Bg8 Kxg8 41. Rb1 Kh8 42. Rf1 Kg8 43. Nd7 Kh8 44. Kg1 Kg8 45. Kg2 Kh8 46. Rf8+ Kg7 47. Rxc8 Kh6 48. b4 Kg7 49. Kf1 Kh6 50. Rf8 Kg7 51. a6 Kh6 52. Rf7 Kg6 53. Rf2 Kg7 54. axb7 Qd5 55. b8=Q Qh1# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "28"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. e3 Nf6 2. c4 e5 3. Nc3 Be7 4. d4 d6 5. Bd3 Bd7 6. Bc2 Nc6 7. Nge2 O-O 8. a3 a6 9. O-O h6 10. Qd3 g6 11. d5 e4 12. Qd1 Ne5 13. b3 Bg4 14. Ra2 Kg7 15. Bb2 Re8 16. Nxe4 Nxe4 17. Bxe4 Bxe2 18. Bxe5+ dxe5 19. Qxe2 f5 20. d6 fxe4 21. dxe7 Qxe7 22. Qg4 Qe6 23. Qxe4 Rab8 24. Rd1 Rbd8 25. Qb1 Qf5 26. Ra1 Qxb1 27. Rdxb1 Rd3 28. a4 Red8 29. g4 a5 30. Rb2 R8d7 31. Kg2 b6 32. c5 bxc5 33. Rc1 R7d5 34. Kf3 Rd1 35. Rbc2 R1d3 36. h4 Rxb3 37. Rxc5 e4+ 38. Kg2 Rxc5 39. Rxc5 Rb4 40. Rxc7+ Kf8 41. Rd7 Rxa4 42. Kg3 Rc4 43. Kf4 Rc2 44. Kg3 g5 45. hxg5 hxg5 46. Rd5 a4 47. Rxg5 a3 48. Kf4 Rxf2+ 49. Kxe4 a2 50. Ra5 Rb2 51. Ra6 Kg7 52. Kd4 Rc2 53. Ke4 Rb2 54. Ke5 Rb5+ 55. Ke4 Rb4+ 56. Kd3 Rb2 57. Ke4 Rb4+ 58. Kf3 Rb2 59. Kf4 Rb4+ 60. Kg5 Rb5+ 61. Kf4 Rb4+ 62. e4 Rb2 63. Ke3 Rb3+ 64. Kd2 Rb2+ 65. Kd3 Kf7 66. Ke3 Rb3+ 67. Kf2 Rb2+ 68. Kg3 Rb3+ 69. Kf4 Rb2 70. Kg3 Rb3+ 71. Kh4 Rb2 72. Kg3 Rb3+ 73. Kf2 Rb2+ 74. Ke3 Rb3+ 75. Kf2 Rb2+ 76. Ke3 Rb3+ 77. Kd4 Rb4+ 78. Kd5 Rb5+ 79. Kc6 Rb2 80. Kc7 Re2 81. e5 Ke7 82. e6 Rc2+ 83. Kb6 Rg2 84. Kc6 Rc2+ 85. Kd5 Rd2+ 86. Ke4 Rc2 87. Ke3 Rc3+ 88. Kd4 Rc2 89. Ke4 Rb2 90. Ke3 Rb3+ 91. Kf2 Rb2+ 92. Ke3 Rb3+ 93. Kf4 Rb4+ 94. Kg5 Rb5+ 95. Kf4 Rb4+ 96. Kf5 Rb5+ 97. Kf4 Rb4+ 98. Kf5 Rb5+ 99. Ke4 Rb4+ 100. Kd5 Rb5+ 101. Kd4 Rb2 102. Ke5 Rb5+ 103. Kf4 Rb4+ 104. Kg3 Rb3+ 105. Kf4 Rb2 106. Kf5 Rb5+ 107. Kf4 Rb2 108. Ke3 Rb3+ 109. Ke4 Rb4+ 110. Kd5 Rb5+ 111. Ke4 Rb4+ 112. Ke5 Rb5+ 113. Kd4 Rb2 114. Ke5 Re2+ 115. Kf4 Rf2+ 116. Kg5 Rb2 117. Kh4 Re2 118. Kh5 Rh2+ 119. Kg6 Rb2 120. Kh6 Rh2+ 121. Kg5 Rb2 122. Kf4 Rf2+ 123. Ke4 Rc2 124. Ke5 Rc5+ 125. Kd4 Rc2 126. Ke3 Rc3+ 127. Kf2 Rc2+ 128. Kf3 Rc3+ 129. Kf4 Rc4+ 130. Kf3 Rc3+ 131. Ke2 Rc2+ 132. Kd3 Rg2 133. Rc6 Rg3+ 134. Ke2 a1=Q 135. Rc7+ Kxe6 136. Rc2 Rg2+ 137. Kf3 Rxc2 138. Kf4 Kf7 139. Kf3 Kg8 140. Kg3 Kh8 141. g5 Kg8 142. g6 Kh8 143. Kh4 Kg8 144. Kh3 Kh8 145. Kg4 Kg8 146. Kh4 Kh8 147. Kh5 Kg8 148. Kg4 Kh8 149. Kh3 Kg8 150. Kg4 Kh8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "33"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 d5 2. d4 c6 3. Bf4 Qb6 4. Nc3 Qxb2 5. Bd2 Nf6 6. Rb1 Qa3 7. e3 Nbd7 8. Bd3 g6 9. Rb3 Qd6 10. e4 dxe4 11. Nxe4 Nxe4 12. Bxe4 Qc7 13. O-O Bg7 14. c4 O-O 15. Re1 e5 16. Bb4 Re8 17. d5 Nf6 18. d6 Qd8 19. Ng5 a5 20. Bc5 Bf8 21. Bb6 Qxd6 22. Qxd6 Bxd6 23. Bc2 a4 24. Rd3 Bf8 25. Rf3 Bg7 26. Ra3 h6 27. Ne4 Nxe4 28. Bxe4 Bf8 29. c5 f5 30. Bd3 Kg7 31. Bc4 Be6 32. Bxe6 Rxe6 33. Rd3 Re7 34. Red1 e4 35. Rd8 Rxd8 36. Rxd8 g5 37. Kf1 Re5 38. Rd7+ Kf6 39. Rxb7 a3 40. Rc7 Ke6 41. Rxc6+ Kd5 42. Rc8 Be7 43. c6 Bc5 44. Bxc5 Kxc5 45. c7 Re7 46. g4 Kb6 47. gxf5 Rf7 48. f6 h5 49. h4 Kb7 50. Re8 Kxc7 51. Re7+ Rxe7 52. fxe7 Kd7 53. e8=Q+ Kxe8 54. hxg5 Kf7 55. Ke2 h4 56. f4 Kg6 57. Kf2 Kf7 58. f5 h3 59. g6+ Kg8 60. f6 e3+ 61. Kg3 e2 62. f7+ Kg7 63. f8=Q+ Kxf8 64. g7+ Kxg7 65. Kh4 Kf7 66. Kh5 h2 67. Kh6 h1=Q+ 68. Kg5 Qg2+ 69. Kh5 Qg1 70. Kh4 Qg2 71. Kh5 e1=Q 72. Kh6 Qg6# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "37"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 c6 2. e4 c5 3. Be2 e6 4. O-O d6 5. d4 cxd4 6. Nxd4 Nc6 7. Nxc6 Qc7 8. Nd4 Bd7 9. Nb5 Qd8 10. Nxd6+ Ke7 11. Nc3 Bc6 12. e5 Qd7 13. Bh5 h6 14. Qg4 b5 15. Nxf7 g6 16. Qxg6 Rh7 17. Qxh7 Rc8 18. Qxg8 b4 19. Qh8 Qd4 20. Qh7 Bg7 21. Qxg7 Rg8 22. Qxg8 Qc4 23. Qd8# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "35"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1-0"]
+
+1. Nf3 d5 2. d4 e6 3. e3 c5 4. Be2 Nf6 5. O-O a6 6. b3 Be7 7. dxc5 Qc7 8. Bb2 Nc6 9. Nbd2 Bxc5 10. c4 Be7 11. cxd5 Na7 12. Rc1 Qd8 13. d6 Bf8 14. Nc4 Nc6 15. Ng5 Nd5 16. f4 h6 17. Nxf7 Kxf7 18. f5 Qg5 19. h4 Qxe3+ 20. Nxe3 Kg8 21. Nxd5 e5 22. Ne7+ Kh7 23. Bd3 e4 24. Bxe4 Bxe7 25. Bxg7 Rf8 26. Bxf8 Bf6 27. Qh5 Bd4+ 28. Kh2 a5 29. Bg7 Kxg7 30. Qg6+ Kf8 31. Bxc6 bxc6 32. Kh3 Bg7 33. Rfe1 Be5 34. Qh7 Bf4 35. Qh8+ Kf7 36. Re7# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "29"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. Nf3 e6 2. Nc3 Nf6 3. e4 Be7 4. d4 d5 5. e5 Ne4 6. Bd3 c5 7. Nxe4 Qa5+ 8. Bd2 Qa4 9. Nd6+ Bxd6 10. exd6 cxd4 11. Ne5 Nc6 12. Qh5 Nxe5 13. Qxe5 f6 14. Qh5+ Kf8 15. Bxh7 Qc6 16. Rc1 Bd7 17. Bb4 a5 18. Ba3 b5 19. c4 b4 20. O-O bxa3 21. b3 Be8 22. Qh4 Bg6 23. cxd5 Qxd6 24. Rc6 Qe5 25. Rxe6 Rxh7 26. Qg3 Qxg3 27. hxg3 Bf7 28. Re4 a4 29. bxa4 d3 30. Rd4 Rh5 31. Rxd3 Rxd5 32. Rxa3 Ra7 33. Rc1 Re7 34. a5 Ra7 35. Rc8+ Ke7 36. a6 Rd6 37. Rb8 Raxa6 38. Rb7+ Kf8 39. Rb8+ Ke7 40. Rb7+ Kf8 41. Rb8+ Ke7 42. Rb7+ Kf8 43. Rb8+ Be8 44. Re3 Re6 45. Rxe6 Rxe6 46. g4 Ra6 47. Rb2 Ke7 48. Rb7+ Kf8 49. Rb2 Ke7 50. Rb7+ Bd7 51. Kh2 Kd8 52. Rb8+ Ke7 53. Kg3 Be6 54. Rb7+ Kd8 55. Rxg7 Ra4 56. f3 Ra3 57. Rg6 Ra4 58. Rxf6 Kd7 59. g5 Ke7 60. Rf4 Ra3 61. g6 Ra5 62. Kh4 Rxa2 63. g4 Bb3 64. Kg5 Ra8 65. Re4+ Kd7 66. Rd4+ Ke6 67. Re4+ Kd7 68. Rd4+ Kc6 69. f4 Kc5 70. Rd7 Kc6 71. Re7 Bg8 72. f5 Kd6 73. Rg7 Bd5 74. Rh7 Ra6 75. f6 Be6 76. f7 Ke7 77. Rh8 Bxf7 78. gxf7 Kxf7 79. Rh7+ Kg8 80. Rc7 Kf8 81. Rc8+ Kf7 82. Rc7+ Kg8 83. Rd7 Kh8 84. Rc7 Ra4 85. Rb7 Ra8 86. Kf6 Rg8 87. g5 Rd8 88. g6 Rc8 89. Rh7+ Kg8 90. Rg7+ Kf8 91. Rf7+ Kg8 92. Rg7+ Kf8 93. Rf7+ Kg8 94. Rg7+ Kf8 95. Rf7+ Kg8 96. Rg7+ Kh8 97. Rh7+ Kg8 98. Rb7 Kh8 99. Rh7+ Kg8 100. Rb7 Ra8 101. Rg7+ Kh8 102. Rh7+ Kg8 103. Rg7+ Kh8 104. Rh7+ Kg8 105. Rg7+ Kf8 106. Rf7+ Kg8 107. Rg7+ Kf8 108. Rf7+ Kg8 109. Ke7 Rc8 110. Kd7 Rc1 111. Ke7 Rc2 112. Rf3 Rc7+ 113. Ke8 Rc8+ 114. Ke7 Rc2 115. Rf7 Rc1 116. Rf3 Rc7+ 117. Ke8 Rc2 118. Ke7 Rc8 119. Rb3 Rc5 120. Rb7 Rc6 121. Rb8+ Kg7 122. Rb4 Rc1 123. Rb6 Rf1 124. Ke8 Ra1 125. Rc6 Rg1 126. Kd8 Ra1 127. Ke8 Rf1 128. Re6 Rf2 129. Ke7 Rd2 130. Ke8 Ra2 131. Kd8 Ra7 132. Re7+ Rxe7 133. Kxe7 Kg8 134. Kf6 Kh8 135. Ke6 Kg8 136. Kf6 Kf8 137. Ke6 Kg8 138. Kf6 Kf8 139. Ke6 Kg8 140. Kf6 Kh8 141. Kg5 Kg8 142. Kh6 Kh8 143. Kg5 Kg8 144. Kh6 Kh8 145. Kg5 Kg8 146. Kh6 Kh8 147. Kg5 Kg8 148. Kh6 Kh8 149. Kh5 Kg8 150. Kg5 Kg7 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "31"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. Nf3 d5 2. d4 c5 3. Nc3 Nc6 4. dxc5 e6 5. e4 Bxc5 6. Bb5 a6 7. Bxc6+ bxc6 8. Qe2 Nf6 9. O-O O-O 10. Na4 Nxe4 11. Nxc5 Nxc5 12. Bg5 Qd6 13. Rad1 f6 14. Be3 Nb7 15. c4 Bd7 16. Qc2 Rfc8 17. Qb3 Nd8 18. Rfe1 Be8 19. Bb6 a5 20. Qc3 e5 21. Bxa5 Ne6 22. Bb4 c5 23. Rxd5 Qb8 24. Ba3 Qb7 25. g3 Rd8 26. Qd3 Qa6 27. Nd2 Rxd5 28. Qxd5 Rd8 29. Qe4 Rxd2 30. h4 Rd4 31. Qf5 Qc8 32. b4 Qd7 33. bxc5 Rd1 34. Bb4 Nxc5 35. Qxd7 Rxe1+ 36. Bxe1 Bxd7 37. Bb4 Na6 38. Bd6 Kf7 39. f4 Ke6 40. c5 Bc6 41. Kf2 Bd5 42. fxe5 fxe5 43. a3 Bc6 44. g4 g6 45. Kg3 h5 46. Kh3 Be8 47. Kg3 Bc6 48. Kh3 Bd7 49. Kg3 Kd5 50. gxh5 gxh5 51. Be7 Bb5 52. c6 Bxc6 53. Bg5 Ba4 54. Kf3 Bd1+ 55. Kf2 Ba4 56. Kf3 Nc5 57. Ke3 Ke6 58. Kf3 Nd7 59. Be3 Kf5 60. Ke2 Ke6 61. Bf2 Nf6 62. Bg1 Kf5 63. Bc5 Ke6 64. Bb4 Kf5 65. Bc5 Nd5 66. Kf3 Bc6 67. Kg3 Ba4 68. Ba7 e4 69. Bc5 Bc6 70. Kf2 Ba4 71. Kg3 e3 72. Kf3 Bd1+ 73. Kg2 Ba4 74. Kf3 Bc2 75. a4 Bd1+ 76. Kg2 Be2 77. Bd6 Ba6 78. Kf3 Bd3 79. Ba3 Bc4 80. Bc5 Ke5 81. Ba7 Kf5 82. Bc5 e2 83. Bf2 Nb4 84. Ke3 Ba6 85. a5 Kg4 86. Be1 Nc2+ 87. Kf2 Kf4 88. Bd2+ Ke4 89. Bc3 Kd3 90. Be1 Nd4 91. Kg3 Ke3 92. Bf2+ Ke4 93. Be1 Nc2 94. Bf2 Ne3 95. Be1 Nc4 96. Kg2 Kd3 97. Kg3 Ke3 98. Bf2+ Ke4 99. Be1 Ne3 100. Bb4 Bb7 101. Bc3 Ng4 102. Bd2 Ba6 103. Be1 Ne5 104. Kf2 Nf3 105. Bb4 Bb5 106. Bc3 Bc4 107. Bb4 Bb5 108. Bc3 Ba6 109. Bb4 Kf4 110. Bd6+ Kf5 111. Bb4 Ke4 112. Bc3 Kf4 113. Bb4 Kg4 114. Bc3 Kf4 115. Bb4 e1=Q+ 116. Bxe1 Nxe1 117. Kxe1 Kf3 118. Kd2 Kg4 119. Ke3 Kxh4 120. Kf4 Bb5 121. Kf3 Kg5 122. Kg3 Ba6 123. Kg2 Kh4 124. Kf3 Bc8 125. Kf4 Bb7 126. Kf5 Kg3 127. Kg6 Kg4 128. Kh7 Be4+ 129. Kh8 Ba8 130. Kg8 h4 131. Kh8 h3 132. Kg8 h2 133. Kh8 Kg5 134. Kg8 Kg4 135. Kh8 Kf4 136. Kg8 Kf3 137. Kh8 Kg3 138. Kg8 Bg2 139. Kh8 Bd5 140. Kh7 Ba8 141. Kh8 Be4 142. Kg8 Kf4 143. Kh8 Ba8 144. Kg8 Bf3 145. Kh8 Kf5 146. Kg8 Be2 147. Kh8 Kf4 148. Kg8 Bf1 149. Kh8 Bb5 150. Kg8 Ke5 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "34"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1/2-1/2"]
+[Termination "Move limit reached"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Be7 5. O-O O-O 6. a3 d6 7. Re1 Nd4 8. h3 Nxf3+ 9. Qxf3 c6 10. a4 Re8 11. a5 Rb8 12. Qg3 Nh5 13. Qf3 Nf6 14. Qg3 Nh5 15. Qh2 Nf6 16. Nd1 Rf8 17. d3 b6 18. axb6 Qxb6 19. Qg3 Kh8 20. Ne3 Nh5 21. Qf3 g6 22. Bd2 Nf4 23. d4 Qxd4 24. Ba5 Qxb2 25. Red1 Qb7 26. Bf1 Be6 27. Nc4 f5 28. Rdb1 Nxh3+ 29. Kh1 Nxf2+ 30. Qxf2 Qxb1 31. Rxb1 Rxb1 32. Qxa7 Rxf1+ 33. Kh2 Bg5 34. Nxd6 Bf4+ 35. g3 Bg5 36. Qc5 fxe4 37. Qxe5+ R8f6 38. Nxe4 Bd5 39. Bb6 Bxe4 40. Bg1 Re1 41. Qxg5 Kg7 42. Qd2 g5 43. Qxg5+ Kf7 44. Qh5+ Kg7 45. c4 Rf2+ 46. Kh3 Bf5+ 47. g4 Rxg1 48. Qg5+ Kf7 49. Qh5+ Kf8 50. Qh6+ Kf7 51. Qh5+ Kf8 52. gxf5 Rh1+ 53. Kg4 Rxh5 54. Kg3 Ke7 55. c5 Kf7 56. f6 Kg8 57. Kg4 Kf8 58. Kxh5 Kf7 59. Kg4 Kxf6 60. Kh5 Kg7 61. Kg5 Kh8 62. Kh6 Kg8 63. Kg5 Kh8 64. Kh6 Kg8 65. Kg5 Kh8 66. Kh6 Kg8 67. Kg5 Kh8 68. Kh6 Kg8 69. Kg5 Kg7 70. Kh5 Kf7 71. Kg4 Kf8 72. Kg3 Rf6 73. Kg4 Kg8 74. Kg5 Kg7 75. Kh5 Kh8 76. Kg4 Kg8 77. Kh4 Kh8 78. Kg5 Kg7 79. Kh5 Kh8 80. Kh4 Kg8 81. Kg5 Kg7 82. Kh5 Kh8 83. Kg5 Kg7 84. Kh5 Kh8 85. Kg5 Rf8 86. Kh4 Kg8 87. Kh5 Kh8 88. Kg4 Kg8 89. Kh5 Kh8 90. Kh4 Kg8 91. Kh5 Kh8 92. Kh6 Kg8 93. Kh5 Kh8 94. Kh4 Kg7 95. Kh3 Rh8 96. Kg4 Rg8 97. Kg3 Rh8 98. Kh3 Rg8 99. Kg3 Rh8 100. Kf2 Rg8 101. Kg3 Rh8 102. Kf3 Rg8 103. Kg3 Rh8 104. Kh2 Rf8 105. Kg2 Rh8 106. Kf1 Rg8 107. Ke2 Rh8 108. Kf2 Rf8+ 109. Ke2 Rh8 110. Kd2 Rg8 111. Kc2 Rh8 112. Kc1 Rg8 113. Kc2 Rh8 114. Kd1 Rg8 115. Kd2 Rh8 116. Ke1 Rg8 117. Kf2 Rh8 118. Kf1 Rg8 119. Kf2 Rh8 120. Ke2 Rg8 121. Kd2 Rh8 122. Ke1 Rg8 123. Kf2 Rh8 124. Ke3 Rg8 125. Kf4 Rh8 126. Ke5 Re8+ 127. Kf4 Rh8 128. Kg3 Rg8 129. Kf3 Rh8 130. Kg2 Rf8 131. Kh2 Rh8 132. Kg3 Rg8 133. Kf3 Re8 134. Kf4 h6 135. Kf3 Rf8+ 136. Ke4 Re8+ 137. Kf5 Rf8+ 138. Ke4 Re8+ 139. Kf3 Rf8+ 140. Ke4 Re8+ 141. Kf3 Rf8+ 142. Ke4 Re8+ 143. Kf3 Rb8 144. Kg3 Rf8 145. Kh4 Rh8 146. Kg4 Rf8 147. Kg3 Rb8 148. Kg4 Rf8 149. Kh3 Rh8 150. Kg4 Rf8 1/2-1/2
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "38"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. d4 Nf6 2. Nf3 e6 3. g3 c5 4. Be3 Qb6 5. Bg2 Qxb2 6. Nbd2 Qc3 7. Rb1 Nc6 8. Rb3 Qa5 9. O-O d5 10. Ne5 cxd4 11. Ndc4 dxc4 12. Nxc6 Qa6 13. Rb2 c3 14. Qxd4 Nd5 15. Nb4 Qa5 16. Nxd5 cxb2 17. Qe5 b1=Q 18. Rxb1 Kd8 19. Bg5+ f6 20. Rd1 exd5 21. Rxd5+ Qxd5 22. Bxf6+ gxf6 23. Qxf6+ Kc7 24. Bxd5 Bg7 25. Qxg7+ Kd6 26. c4 Re8 27. Qd4 Bd7 28. h4 Bc6 29. c5+ Kd7 30. Bg2+ Kc8 31. Qg7 Bxg2 32. g4 Be4 33. f3 Bc6 34. Qxh7 Rxe2 35. h5 Rxa2 36. Qg8+ Kd7 37. Qxa2 Rf8 38. f4 Ke7 39. Qa1 Kf7 40. h6 Rg8 41. Qa2+ Kf8 42. Qe6 Be4 43. Qxe4 Rxg4+ 44. Kf1 Rh4 45. Qf5+ Kg8 46. Qg5+ Kf8 47. Qd8+ Kf7 48. Qd6 Rh1+ 49. Ke2 Rh2+ 50. Kd3 Rh3+ 51. Ke2 Rh2+ 52. Kd3 Rh3+ 53. Kd4 Rh4 54. Qd7+ Kf8 55. Qg7+ Ke8 56. Ke4 Kd8 57. Qg5+ Ke8 58. Qxh4 Kf8 59. h7 Ke8 60. Qf6 Kd7 61. h8=R Kc7 62. Qd6# 1-0
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "40"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. e3 Nf6 2. c4 e5 3. Nc3 Be7 4. Nf3 Nc6 5. Be2 Rb8 6. O-O O-O 7. d4 d6 8. a3 Re8 9. Qc2 exd4 10. Na2 dxe3 11. fxe3 Ne5 12. Nxe5 dxe5 13. b4 c5 14. h3 Qc7 15. Nc3 Be6 16. Bd3 Red8 17. Bb2 cxb4 18. axb4 Bxc4 19. Nb5 Qb6 20. Bxc4 Qxe3+ 21. Qf2 Qxf2+ 22. Rxf2 a6 23. Na3 Bd6 24. Nc2 Rbc8 25. Bb3 Rc7 26. Raf1 Re7 27. Re2 b6 28. Ra1 a5 29. Ba3 axb4 30. Bxb4 Bc5+ 31. Kh1 Nh5 32. Be1 Nf4 33. Re4 Nd3 34. Ne3 Nxe1 35. Nf5 Nd3 36. Rf1 Red7 37. Rc4 g6 38. Rh4 gxf5 39. Rxf5 Nc1 40. Ba4 Rd1+ 41. Kh2 Bg1+ 42. Kg3 R8d3+ 43. Kg4 Rd4+ 44. Kf3 R1d3# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "39"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 d5 2. d4 Nf6 3. e3 c5 4. Be2 e6 5. O-O Nc6 6. c3 Be7 7. dxc5 O-O 8. Nbd2 Bxc5 9. b4 Bd6 10. b5 Ne7 11. Bb2 a6 12. bxa6 bxa6 13. c4 Ng6 14. Qc2 a5 15. Rab1 Bd7 16. Bd3 Bc6 17. Ba1 Qe7 18. Rb6 Bd7 19. Bxg6 fxg6 20. Ne5 Rfc8 21. Rfb1 Be8 22. Bd4 Bb4 23. c5 g5 24. Ndf3 Ne4 25. Nd3 Nxc5 26. Nxc5 Bxc5 27. Rc1 Bxd4 28. Qxc8 Rxc8 29. Rxc8 Bxb6 30. h3 Bc7 31. Ra8 Qd7 32. Kh1 e5 33. Kg1 g4 34. hxg4 Qc6 35. Rc8 h6 36. Nd2 Kf8 37. Nb3 Qb6 38. g5 hxg5 39. Ra8 a4 40. Nc5 Qb1+ 41. Kh2 e4+ 42. g3 Qf1 43. Ne6+ Kf7 44. Nxg5+ Kf6 45. Nh3 Ke7 46. Rc8 Kd7 47. Ra8 Ke7 48. Rc8 Kd7 49. Ra8 a3 50. Ra7 Kd6 51. Ra8 Kd7 52. Ra7 Kc6 53. Ra8 Bd7 54. Rh8 Be6 55. Rg8 Kc5 56. Rh8 Bxh3 57. Rxh3 Qc4 58. Rh8 Qa6 59. Kg2 Bb6 60. Rh1 Qe2 61. Rc1+ Kb4 62. Rb1+ Qb2 63. Re1 Qxa2 64. Kh3 Qxf2 65. Kh4 a2 66. Kh5 Qf6 67. Kg4 Qe6+ 68. Kh5 Qf5+ 69. Kh4 Bd8# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.17"]
+[Round "36"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "0-1"]
+
+1. c4 Nf6 2. g3 Nc6 3. Nf3 e5 4. Bg2 Bc5 5. d3 e4 6. Ng5 exd3 7. O-O h6 8. Nf3 dxe2 9. Qxe2+ Kf8 10. Rd1 d6 11. a3 Bg4 12. b4 Nd4 13. Qd3 Bf5 14. Qf1 Nb3 15. Nc3 Nxa1 16. bxc5 Nb3 17. cxd6 Nxc1 18. Ne5 cxd6 19. c5 Qa5 20. Nxf7 Kxf7 21. Rxc1 Rhd8 22. Bxb7 Rab8 23. Bg2 dxc5 24. Qe1 c4 25. Qe3 Rb3 26. Bf1 Bd3 27. Bxd3 Rxd3 28. Nd1 Rxe3 29. Nb2 Qg5 30. Nxc4 Rxg3+ 31. hxg3 Qxc1+ 32. Kg2 Kg8 33. Ne5 Kh8 34. g4 Kg8 35. f3 Kh8 36. Kh2 Kg8 37. Ng6 Kh7 38. Nf8+ Kh8 39. Kh3 Kg8 40. Kg2 Kh8 41. Kh2 Kg8 42. Ne6 Kh8 43. Nf8 Kg8 44. a4 Kh8 45. Ng6+ Kg8 46. g5 Kh7 47. Ne7 Kh8 48. gxf6 Kh7 49. Nc6 Kh8 50. f7 Rxf3 51. f8=Q+ Rxf8 52. Na5 Kg8 53. Kg2 Kh8 54. Nc6 Kg8 55. Nd4 Kh8 56. Nc2 Kg8 57. Na3 Kh8 58. Nb1 Kg8 59. Nd2 Kh8 60. Nb3 Rc8 61. Kf2 Kg8 62. Kf3 Kh8 63. Na5 Kg8 64. Ke2 Kh8 65. Kf2 Kg8 66. Nc6 Kh8 67. Ne7 Kh7 68. Kg2 Rh8 69. Kg3 Rg8 70. Kh3 Rh8 71. Kg3 Rg8 72. Kf3 Rh8 73. Kg3 Rg8 74. Nd5 Rh8 75. Ne7 Rg8 76. Kf2 Rf8+ 77. Ke2 Rh8 78. Nf5 Rg8 79. Ne7 Rh8 80. Kd3 Rg8 81. Nd5 Rh8 82. Nc3 Rg8 83. Nb5 Rh8 84. Kd4 Rg8 85. Ke4 Rh8 86. Nd6 Rg8 87. Kd3 Rh8 88. Nb5 Rg8 89. Nc3 Rh8 90. Ne4 Rg8 91. Kd4 Rh8 92. Nd6 Rg8 93. Ke5 Rh8 94. Kd5 Rg8 95. Nf5 Rh8 96. Ng3 Rg8 97. Nh5 Rh8 98. Ke6 Rg8 99. Kd7 Rh8 100. Ke6 Rg8 101. Ke5 Rh8 102. Kd5 Rg8 103. Ke4 Rh8 104. Nf4 Rg8 105. Nd3 Re8+ 106. Kd4 Rd8+ 107. Ke4 Re8+ 108. Kd5 Rd8+ 109. Ke6 Re8+ 110. Kf5 Qg5# 0-1
+
