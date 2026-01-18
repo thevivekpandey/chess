@@ -16,6 +16,7 @@ import requests
 import os
 from typing import List, Tuple, Optional, Dict
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 import time
 
 # Cloud GPU inference endpoint
@@ -410,16 +411,30 @@ def run_parallel_match(
                         game.make_move(move)
                         moves_this_batch += 1
 
-                # Process Stockfish moves (parallel using respective engines)
-                for i, game in enumerate(sf_turn_games):
-                    engine_idx = games.index(game) % len(engines)
-                    result = engines[engine_idx].play(game.board, chess.engine.Limit(time=time_limit))
-                    move = result.move
-                    move_san = game.board.san(move)
-                    move_label = game.format_move_number()
-                    print(f"  Game {game.game_num}, {move_label} (SF): {move_san}", flush=True)
-                    game.make_move(move)
-                    moves_this_batch += 1
+                # Process Stockfish moves (parallel using ThreadPoolExecutor)
+                if sf_turn_games:
+                    def get_sf_move(game_and_engine):
+                        game, engine = game_and_engine
+                        result = engine.play(game.board, chess.engine.Limit(time=time_limit))
+                        return game, result.move
+
+                    # Pair each game with its engine
+                    game_engine_pairs = [
+                        (game, engines[games.index(game) % len(engines)])
+                        for game in sf_turn_games
+                    ]
+
+                    # Execute all SF moves in parallel
+                    with ThreadPoolExecutor(max_workers=len(sf_turn_games)) as executor:
+                        sf_results = list(executor.map(get_sf_move, game_engine_pairs))
+
+                    # Apply the moves
+                    for game, move in sf_results:
+                        move_san = game.board.san(move)
+                        move_label = game.format_move_number()
+                        print(f"  Game {game.game_num}, {move_label} (SF): {move_san}", flush=True)
+                        game.make_move(move)
+                        moves_this_batch += 1
 
             batch_time = time.time() - batch_start
 
