@@ -4,13 +4,15 @@ Generate Top 5 Stockfish Moves for Chess Positions
 Usage:
     python generate_top_moves.py input.csv output.csv --threads 8 --depth 16
 
-Input CSV format:
-    fen
-    rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+Input CSV format (fen,eval):
+    fen,eval
+    rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1,0.2
     ...
 
 Output CSV format:
-    fen,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5
+    fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5
+
+The eval from the input file is preserved for joint value/policy head training.
 """
 
 import argparse
@@ -28,34 +30,37 @@ import sys
 DEFAULT_STOCKFISH_PATH = "/opt/homebrew/bin/stockfish"
 
 
-def analyze_position(args: Tuple[str, str, int, int]) -> Tuple[str, List[Tuple[str, int]]]:
-    """
-    Analyze a single position with Stockfish multi-PV.
+def worker_init(stockfish_path: str, depth: int, num_moves: int):
+    """Initialize worker with persistent Stockfish engine."""
+    global WORKER_ENGINE, WORKER_DEPTH, WORKER_NUM_MOVES
+    WORKER_ENGINE = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+    # Optional: configure engine for speed
+    try:
+        WORKER_ENGINE.configure({"Threads": 1, "Hash": 16})
+    except chess.engine.EngineError:
+        pass  # Some options might not be available
+    WORKER_DEPTH = depth
+    WORKER_NUM_MOVES = num_moves
 
-    Args:
-        args: Tuple of (fen, stockfish_path, depth, num_moves)
 
-    Returns:
-        Tuple of (fen, [(move_uci, score_cp), ...])
-    """
-    fen, stockfish_path, depth, num_moves = args
+def worker_analyze(fen_eval: Tuple[str, str]) -> Tuple[str, str, List[Tuple[str, int]]]:
+    """Worker function that reuses persistent Stockfish engine."""
+    global WORKER_ENGINE, WORKER_DEPTH, WORKER_NUM_MOVES
+    fen, eval_score = fen_eval
 
     try:
         board = chess.Board(fen)
         if not board.is_valid():
-            return (fen, [])
+            return (fen, eval_score, [])
     except ValueError:
-        return (fen, [])
+        return (fen, eval_score, [])
 
-    engine = None
     try:
-        engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
-
-        # Run multi-PV analysis
-        analysis = engine.analyse(
+        # Run multi-PV analysis using persistent engine
+        analysis = WORKER_ENGINE.analyse(
             board,
-            chess.engine.Limit(depth=depth),
-            multipv=num_moves
+            chess.engine.Limit(depth=WORKER_DEPTH),
+            multipv=WORKER_NUM_MOVES
         )
 
         moves = []
@@ -67,91 +72,114 @@ def analyze_position(args: Tuple[str, str, int, int]) -> Tuple[str, List[Tuple[s
                 # Convert score to centipawns
                 if score.is_mate():
                     mate_in = score.mate()
-                    # Use large values for mate scores
                     cp = 10000 - abs(mate_in) if mate_in > 0 else -10000 + abs(mate_in)
                 else:
                     cp = score.score()
 
                 moves.append((move.uci(), cp))
 
-        return (fen, moves)
+        return (fen, eval_score, moves)
 
     except Exception as e:
         print(f"Error analyzing {fen}: {e}", file=sys.stderr)
-        return (fen, [])
-
-    finally:
-        if engine:
-            engine.quit()
+        return (fen, eval_score, [])
 
 
-def worker_init(stockfish_path: str, depth: int, num_moves: int):
-    """Initialize worker with shared parameters."""
-    global WORKER_STOCKFISH_PATH, WORKER_DEPTH, WORKER_NUM_MOVES
-    WORKER_STOCKFISH_PATH = stockfish_path
-    WORKER_DEPTH = depth
-    WORKER_NUM_MOVES = num_moves
-
-
-def worker_analyze(fen: str) -> Tuple[str, List[Tuple[str, int]]]:
-    """Worker function that uses global parameters."""
-    return analyze_position((fen, WORKER_STOCKFISH_PATH, WORKER_DEPTH, WORKER_NUM_MOVES))
-
-
-def process_batch(
-    fens: List[str],
+def process_positions(
+    fen_evals: List[Tuple[str, str]],
     stockfish_path: str,
     num_threads: int,
     depth: int,
-    num_moves: int
-) -> List[Tuple[str, List[Tuple[str, int]]]]:
+    num_moves: int,
+    output_file: str,
+    report_interval: int = 10
+) -> int:
     """
-    Process a batch of FENs in parallel.
+    Process FENs in parallel with progress reporting and incremental saving.
 
     Args:
-        fens: List of FEN strings
+        fen_evals: List of (fen, eval) tuples
         stockfish_path: Path to Stockfish executable
         num_threads: Number of parallel workers
         depth: Search depth
         num_moves: Number of top moves to return
+        output_file: Path to output CSV file (written incrementally)
+        report_interval: How often to print progress and save (every N positions)
 
     Returns:
-        List of (fen, moves) tuples
+        Number of positions processed
     """
+    total = len(fen_evals)
+    start_time = time.time()
+    pending_results = []
+
+    # Write header
+    with open(output_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        header = ['fen', 'eval']
+        for i in range(1, num_moves + 1):
+            header.extend([f'move{i}', f'score{i}'])
+        writer.writerow(header)
+
     with mp.Pool(
         processes=num_threads,
         initializer=worker_init,
         initargs=(stockfish_path, depth, num_moves)
     ) as pool:
-        results = pool.map(worker_analyze, fens)
+        for i, result in enumerate(pool.imap_unordered(worker_analyze, fen_evals), 1):
+            pending_results.append(result)
 
-    return results
+            if i % report_interval == 0 or i == total:
+                # Write pending results to file
+                with open(output_file, 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    for fen, eval_score, moves in pending_results:
+                        row = [fen, eval_score]
+                        for j in range(num_moves):
+                            if j < len(moves):
+                                move_uci, score = moves[j]
+                                row.extend([move_uci, score])
+                            else:
+                                row.extend(['', ''])
+                        writer.writerow(row)
+                pending_results = []
+
+                # Progress report
+                elapsed = time.time() - start_time
+                positions_per_sec = i / elapsed if elapsed > 0 else 0
+                eta_seconds = (total - i) / positions_per_sec if positions_per_sec > 0 else 0
+                print(f"  Progress: {i:,}/{total:,} "
+                      f"({i/total*100:.1f}%) | "
+                      f"{positions_per_sec:.1f} pos/sec | "
+                      f"ETA: {eta_seconds/60:.1f} min [saved]", flush=True)
+
+    return total
 
 
-def load_fens(input_file: str) -> List[str]:
-    """Load FENs from CSV file."""
-    fens = []
+def load_fen_evals(input_file: str) -> List[Tuple[str, str]]:
+    """Load FENs and evals from CSV file (format: fen,eval)."""
+    fen_evals = []
     with open(input_file, 'r', newline='') as f:
         reader = csv.reader(f)
         header = next(reader, None)
 
         # Check if first row looks like a header
-        if header:
+        if header and len(header) >= 2:
             first_field = header[0].strip().lower()
             if first_field not in ('fen', 'position', 'board'):
                 # First row is data, not header
-                fens.append(header[0].strip())
+                fen_evals.append((header[0].strip(), header[1].strip()))
 
         for row in reader:
-            if row:
-                fens.append(row[0].strip())
+            if row and len(row) >= 2:
+                fen_evals.append((row[0].strip(), row[1].strip()))
 
-    return fens
+    return fen_evals
 
 
 def write_results(
     output_file: str,
-    results: List[Tuple[str, List[Tuple[str, int]]]],
+    results: List[Tuple[str, str, List[Tuple[str, int]]]],
     num_moves: int
 ):
     """Write results to CSV file."""
@@ -159,14 +187,14 @@ def write_results(
         writer = csv.writer(f)
 
         # Header
-        header = ['fen']
+        header = ['fen', 'eval']
         for i in range(1, num_moves + 1):
             header.extend([f'move{i}', f'score{i}'])
         writer.writerow(header)
 
         # Data rows
-        for fen, moves in results:
-            row = [fen]
+        for fen, eval_score, moves in results:
+            row = [fen, eval_score]
             for i in range(num_moves):
                 if i < len(moves):
                     move_uci, score = moves[i]
@@ -182,8 +210,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python generate_top_moves.py positions.csv output.csv --threads 8
+    python generate_top_moves.py input.csv output.csv --threads 8
     python generate_top_moves.py data.csv moves.csv --threads 16 --depth 20 --moves 10
+    python generate_top_moves.py data.csv out.csv -t 8 -r 100  # Report every 100 positions
         """
     )
     parser.add_argument('input_file', help='Input CSV file with FENs')
@@ -196,8 +225,8 @@ Examples:
                         help='Number of top moves to generate (default: 5)')
     parser.add_argument('--stockfish', '-s', type=str, default=DEFAULT_STOCKFISH_PATH,
                         help=f'Path to Stockfish executable (default: {DEFAULT_STOCKFISH_PATH})')
-    parser.add_argument('--batch-size', '-b', type=int, default=10000,
-                        help='Batch size for progress reporting (default: 10000)')
+    parser.add_argument('--report-interval', '-r', type=int, default=10,
+                        help='Print progress every N positions (default: 10)')
 
     args = parser.parse_args()
 
@@ -223,59 +252,37 @@ Examples:
     print(f"Stockfish:   {args.stockfish}")
     print("=" * 70)
 
-    # Load FENs
-    print("Loading FENs...", end=' ', flush=True)
-    fens = load_fens(args.input_file)
-    print(f"loaded {len(fens):,} positions")
+    # Load FENs and evals
+    print("Loading positions...", end=' ', flush=True)
+    fen_evals = load_fen_evals(args.input_file)
+    print(f"loaded {len(fen_evals):,} positions")
 
-    if len(fens) == 0:
+    if len(fen_evals) == 0:
         print("Error: No positions found in input file", file=sys.stderr)
         sys.exit(1)
 
-    # Process in batches for progress reporting
-    all_results = []
-    batch_size = args.batch_size
+    # Process positions with progress reporting and incremental saving
+    print(f"\nProcessing positions (saving every {args.report_interval} positions)...")
     start_time = time.time()
 
-    print(f"\nProcessing positions...")
-
-    for batch_start in range(0, len(fens), batch_size):
-        batch_end = min(batch_start + batch_size, len(fens))
-        batch_fens = fens[batch_start:batch_end]
-
-        batch_results = process_batch(
-            batch_fens,
-            args.stockfish,
-            args.threads,
-            args.depth,
-            args.moves
-        )
-        all_results.extend(batch_results)
-
-        # Progress report
-        elapsed = time.time() - start_time
-        positions_done = len(all_results)
-        positions_per_sec = positions_done / elapsed if elapsed > 0 else 0
-        eta_seconds = (len(fens) - positions_done) / positions_per_sec if positions_per_sec > 0 else 0
-
-        print(f"  Progress: {positions_done:,}/{len(fens):,} "
-              f"({positions_done/len(fens)*100:.1f}%) | "
-              f"{positions_per_sec:.1f} pos/sec | "
-              f"ETA: {eta_seconds/60:.1f} min", flush=True)
-
-    # Write results
-    print(f"\nWriting results to {args.output_file}...", end=' ', flush=True)
-    write_results(args.output_file, all_results, args.moves)
-    print("done")
+    positions_processed = process_positions(
+        fen_evals,
+        args.stockfish,
+        args.threads,
+        args.depth,
+        args.moves,
+        args.output_file,
+        report_interval=args.report_interval
+    )
 
     # Summary
     total_time = time.time() - start_time
     print("\n" + "=" * 70)
     print("COMPLETE")
     print("=" * 70)
-    print(f"Positions processed: {len(all_results):,}")
+    print(f"Positions processed: {positions_processed:,}")
     print(f"Total time: {total_time/60:.1f} minutes")
-    print(f"Average speed: {len(all_results)/total_time:.1f} positions/second")
+    print(f"Average speed: {positions_processed/total_time:.1f} positions/second")
     print(f"Output saved to: {args.output_file}")
     print("=" * 70)
 

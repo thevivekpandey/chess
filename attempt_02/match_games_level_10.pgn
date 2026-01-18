@@ -1,7 +1,38 @@
 ; Multiprocess Match: Neural Network vs Stockfish
-; Date: 2026-01-18 07:37:38
+; Date: 2026-01-18 07:40:28
 ; NN Search Depth: 3 ply
 ; Stockfish Skill Level: 10
 ; Stockfish Time: 5.0s per move
 ; Worker Processes: 2
 
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.18"]
+[Round "1"]
+[White "NeuralNet"]
+[Black "Stockfish"]
+[Result "0-1"]
+
+1. Nf3 e6 2. Nc3 c5 3. e4 Nc6 4. Bb5 Qc7 5. Bxc6 bxc6 6. O-O e5 7. Rb1 d6 8. Re1 Rb8 9. Ne2 Nf6 10. d3 h6 11. Ng3 Be7 12. b3 a5 13. Nf5 Bxf5 14. exf5 Qc8 15. Nh4 Nh7 16. Qg4 g5 17. Nf3 Rb4 18. Qg3 Qxf5 19. Nxe5 dxe5 20. Rxe5 Qd7 21. Bd2 O-O 22. Bxb4 axb4 23. Ree1 Nf6 24. Qh3 Qxh3 25. gxh3 Bd6 26. h4 gxh4 27. Rbd1 Ra8 28. d4 Rxa2 29. dxc5 Bxc5 30. Rd8+ Kh7 31. Rd2 h3 32. Kf1 Kg6 33. Rd3 Rxc2 34. Re2 Rc3 35. Rxc3 bxc3 36. Rc2 Bd4 37. Ke2 Kf5 38. Kd3 Be5 39. f4 Kxf4 40. Rf2+ Kg5 41. Rc2 Ng4 42. Ke2 f5 43. Rc1 Nxh2 44. Rg1+ Ng4 45. Rh1 h2 46. Kf3 Bf4 47. Kg2 c2 48. Kh3 Nf2+ 49. Kg2 Nxh1 50. Kh3 c1=Q 51. Kg2 Kg4 52. b4 c5 53. bxc5 Qg1# 0-1
+
+[Event "NN vs Stockfish Match"]
+[Site "Local"]
+[Date "2026.01.18"]
+[Round "2"]
+[White "Stockfish"]
+[Black "NeuralNet"]
+[Result "1-0"]
+
+1. d4 Nf6 2. Nf3 e6 3. c4 c5 4. d5 d6 5. h3 Be7 6. Nc3 exd5 7. cxd5 O-O 8. e4 a6 9. Qc2 Nbd7 10. a4 Re8 11. Be2 Rb8 12. Bf4 Bf8 13. Nd2 Ne5 14. O-O Nfd7 15. a5 Ng6 16. Bh2 Be7 17. f4 Nf6 18. Nc4 Nd7 19. Na4 Ra8 20. Bg3 Rb8 21. Bh2 Ra8 22. Kh1 Rb8 23. e5 Bf8 24. e6 fxe6 25. dxe6 Nf6 26. f5 Ne5 27. Rfd1 Nxc4 28. Bxc4 Kh8 29. Nb6 Be7 30. Rd2 Rg8 31. Re2 h6 32. Bb3 Rf8 33. Qd3 Re8 34. Rae1 Rg8 35. Rd2 Qc7 36. Rde2 Qd8 37. Rd2 Qc7 38. Ba4 Qd8 39. Rdd1 Nh5 40. Bc2 Nf6 41. Bxd6 Qxd6 42. Qxd6 Bxd6 43. Rxd6 Kh7 44. e7 Re8 45. Kg1 Bxf5 46. Bxf5+ Kh8 47. Nd7 Nxd7 48. Rxd7 g5 49. Bg6 Kg7 50. Bxe8 Rxe8 51. Rd8 Kf7 52. Rxe8 Kxe8 53. Kf2 h5 54. Kg3 c4 55. Re6 g4 56. h4 c3 57. bxc3 Kf7 58. e8=Q+ Kg7 59. Re7+ Kh6 60. c4 b6 61. c5 bxc5 62. Qc6# 1-0
+
+
+; ==================================================
+; MATCH SUMMARY
+; ==================================================
+; Neural Network wins: 0 (0.0%)
+; Stockfish wins:      2 (100.0%)
+; Draws:               0 (0.0%)
+; Games completed:     2
+; Total time:          8.9 minutes
+; Positions evaluated: 1,434,676
+; ==================================================
