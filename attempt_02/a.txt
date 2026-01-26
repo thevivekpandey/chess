@@ -1,0 +1,32 @@
+def get_top_moves_from_tensors(
+    board: chess.Board,
+    source_logits: torch.Tensor,  # Shape: (8, 8)
+    dest_logits: torch.Tensor,    # Shape: (8, 8)
+    top_k: int = 5
+) -> List[Tuple[str, float]]:
+    """
+    Get top moves directly from model output tensors.
+
+    Returns:
+        List of (move_uci, score) tuples
+    """
+    # Convert to probabilities
+    source_probs = F.softmax(source_logits.view(-1), dim=0).view(8, 8)
+    dest_probs = F.softmax(dest_logits.view(-1), dim=0).view(8, 8)
+
+    move_scores = []
+    for move in board.legal_moves:
+        # Convert squares to tensor indices
+        src_row = 7 - chess.square_rank(move.from_square)  # Flip for tensor coords
+        src_col = chess.square_file(move.from_square)
+        dst_row = 7 - chess.square_rank(move.to_square)
+        dst_col = chess.square_file(move.to_square)
+
+        # Combined probability
+        score = (source_probs[src_row, src_col] * dest_probs[dst_row, dst_col]).item()
+        move_scores.append((move.uci(), score))
+
+    # Sort and return top-k
+    move_scores.sort(key=lambda x: x[1], reverse=True)
+    return move_scores[:top_k]
+
