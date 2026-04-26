@@ -1,6 +1,0 @@
-; Match: Neural Network vs Stockfish (Skill 0)
-; Date: 2026-01-15 21:43:40
-; Model: chess_model_epoch070.pt
-; NN Search Depth: 3 ply
-; Stockfish Time: 10.0s per move
-
