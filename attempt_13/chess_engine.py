@@ -37,12 +37,15 @@ logging.getLogger('ThreadMonitor').setLevel(logging.WARNING)
 
 import chess
 import os
+import multiprocessing as mp
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from contextlib import nullcontext
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Iterator
 import time
 
 
@@ -638,7 +641,7 @@ class ChessNet(nn.Module):
 
         # Value head
         value_out = F.relu(self.value_bn(self.value_conv(out)))
-        value_out = value_out.view(value_out.size(0), -1)  # Flatten
+        value_out = value_out.flatten(1)
         value_out = F.relu(self.fc1(value_out))
         value = torch.tanh(self.fc2(value_out))
 
@@ -652,6 +655,130 @@ class ChessNet(nn.Module):
 # =============================================================================
 # DATASET
 # =============================================================================
+
+DEFAULT_PRECOMPUTE_WORKERS = min(os.cpu_count() or 1, 16)
+DEFAULT_PRECOMPUTE_CHUNK_SIZE = 4096
+PRECOMPUTE_PROGRESS_INTERVAL = 500_000
+
+
+def _get_env_int(name: str, default: int, minimum: int = 1) -> int:
+    """Read a positive integer from the environment."""
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    try:
+        return max(minimum, int(raw_value))
+    except ValueError:
+        print(f"Warning: ignoring invalid {name}={raw_value!r}; using {default}")
+        return default
+
+
+def _normalize_dataset_item(item):
+    """Support both (fen, eval) and (fen, eval, moves, scores) dataset rows."""
+    if len(item) == 2:
+        fen, eval_pawns = item
+        return fen, eval_pawns, [], []
+    fen, eval_pawns, moves, scores = item
+    return fen, eval_pawns, moves, scores
+
+
+def _precompute_dataset_chunk(args):
+    """
+    Precompute one contiguous dataset chunk.
+
+    Returns numpy arrays instead of torch tensors so multiprocessing only needs
+    to serialize compact numeric buffers back to the parent process.
+    """
+    start_idx, chunk, max_pawns, policy_temperature = args
+    chunk_size = len(chunk)
+
+    board_tensors = np.empty((chunk_size, NUM_PLANES, 8, 8), dtype=np.float32)
+    eval_tensors = np.empty((chunk_size, 1), dtype=np.float32)
+    policy_indices = np.full((chunk_size, MAX_POLICY_MOVES), -1, dtype=np.int32)
+    policy_weights = np.zeros((chunk_size, MAX_POLICY_MOVES), dtype=np.float32)
+    has_policy = np.zeros(chunk_size, dtype=np.bool_)
+    legal_move_indices = np.empty((chunk_size, MAX_LEGAL_MOVES), dtype=np.int16)
+
+    for local_idx, item in enumerate(chunk):
+        fen, eval_pawns, moves, scores = _normalize_dataset_item(item)
+
+        board_tensors[local_idx] = fen_to_tensor(fen).numpy()
+        eval_tensors[local_idx, 0] = normalize_eval(eval_pawns, max_pawns)
+
+        if moves:
+            sparse_result = moves_to_policy_sparse(moves, scores, policy_temperature)
+            if sparse_result is not None:
+                indices, weights = sparse_result
+                policy_indices[local_idx] = indices
+                policy_weights[local_idx] = weights
+                has_policy[local_idx] = True
+
+        legal_move_indices[local_idx] = get_legal_move_indices(fen)
+
+    return (
+        start_idx,
+        board_tensors,
+        eval_tensors,
+        policy_indices,
+        policy_weights,
+        has_policy,
+        legal_move_indices,
+    )
+
+
+def _iter_precompute_tasks(
+    data: List[Tuple[str, float, List[str], List[float]]],
+    max_pawns: float,
+    policy_temperature: float,
+    chunk_size: int,
+) -> Iterator[tuple]:
+    for start_idx in range(0, len(data), chunk_size):
+        yield (
+            start_idx,
+            data[start_idx:start_idx + chunk_size],
+            max_pawns,
+            policy_temperature,
+        )
+
+
+def _copy_precomputed_chunk(
+    result,
+    board_tensors: np.ndarray,
+    eval_tensors: np.ndarray,
+    policy_indices: np.ndarray,
+    policy_weights: np.ndarray,
+    has_policy: np.ndarray,
+    legal_move_indices: np.ndarray,
+) -> int:
+    (
+        start_idx,
+        chunk_boards,
+        chunk_evals,
+        chunk_policy_indices,
+        chunk_policy_weights,
+        chunk_has_policy,
+        chunk_legal_indices,
+    ) = result
+    end_idx = start_idx + len(chunk_boards)
+
+    board_tensors[start_idx:end_idx] = chunk_boards
+    eval_tensors[start_idx:end_idx] = chunk_evals
+    policy_indices[start_idx:end_idx] = chunk_policy_indices
+    policy_weights[start_idx:end_idx] = chunk_policy_weights
+    has_policy[start_idx:end_idx] = chunk_has_policy
+    legal_move_indices[start_idx:end_idx] = chunk_legal_indices
+
+    return len(chunk_boards)
+
+
+def _print_precompute_progress(processed: int, total: int, next_report: int) -> int:
+    while processed >= next_report and next_report < total:
+        print(f"  Processed {next_report:,} / {total:,} positions...", flush=True)
+        next_report += PRECOMPUTE_PROGRESS_INTERVAL
+    if processed == total:
+        print(f"  Processed {total:,} / {total:,} positions...", flush=True)
+    return next_report
+
 
 class ChessDataset(Dataset):
     """
@@ -670,85 +797,118 @@ class ChessDataset(Dataset):
         self,
         data: List[Tuple[str, float, List[str], List[float]]],
         max_pawns: float = 10.0,
-        policy_temperature: float = 1.0
+        policy_temperature: float = 1.0,
+        num_workers: Optional[int] = None,
+        precompute_chunk_size: Optional[int] = None,
     ):
         """
         Args:
             data: List of (fen, eval_pawns, moves, scores) tuples
             max_pawns: Scaling factor for evaluation normalization
             policy_temperature: Temperature for softmax over move scores
+            num_workers: CPU processes for precomputation. Defaults to
+                CHESS_PRECOMPUTE_WORKERS or up to 16 CPUs.
+            precompute_chunk_size: Positions per worker task. Defaults to
+                CHESS_PRECOMPUTE_CHUNK_SIZE or 4096.
         """
         self.max_pawns = max_pawns
+        total_positions = len(data)
+        if num_workers is None:
+            num_workers = _get_env_int(
+                'CHESS_PRECOMPUTE_WORKERS',
+                DEFAULT_PRECOMPUTE_WORKERS
+            )
+        if precompute_chunk_size is None:
+            precompute_chunk_size = _get_env_int(
+                'CHESS_PRECOMPUTE_CHUNK_SIZE',
+                DEFAULT_PRECOMPUTE_CHUNK_SIZE
+            )
+        num_workers = max(1, min(num_workers, total_positions or 1))
+        precompute_chunk_size = max(1, precompute_chunk_size)
 
         # Precompute all board tensors and normalized evaluations
-        print(f"Precomputing {len(data):,} board tensors...")
+        print(f"Precomputing {total_positions:,} board tensors...")
         print("  (Also computing legal move indices for policy masking)")
-        self.board_tensors = []
-        self.eval_tensors = []
-        # Sparse policy storage: indices and weights
-        self.policy_indices = []  # Shape (N, MAX_POLICY_MOVES), -1 for invalid
-        self.policy_weights = []  # Shape (N, MAX_POLICY_MOVES)
-        self.has_policy = []  # Track which samples have valid policy targets
-        # Legal move indices for policy training (sparse representation)
-        self.legal_move_indices = []  # Shape (N, MAX_LEGAL_MOVES), int16
+        print(f"  Using {num_workers} precompute worker(s), chunk size {precompute_chunk_size:,}")
 
-        for i, item in enumerate(data):
-            # Handle both old format (fen, eval) and new format (fen, eval, moves, scores)
-            if len(item) == 2:
-                fen, eval_pawns = item
-                moves, scores = [], []
-            else:
-                fen, eval_pawns, moves, scores = item
+        board_tensors = np.empty((total_positions, NUM_PLANES, 8, 8), dtype=np.float32)
+        eval_tensors = np.empty((total_positions, 1), dtype=np.float32)
+        policy_indices = np.empty((total_positions, MAX_POLICY_MOVES), dtype=np.int32)
+        policy_weights = np.empty((total_positions, MAX_POLICY_MOVES), dtype=np.float32)
+        has_policy = np.empty(total_positions, dtype=np.bool_)
+        legal_move_indices = np.empty((total_positions, MAX_LEGAL_MOVES), dtype=np.int16)
 
-            # Convert FEN to tensor
-            board_tensor = fen_to_tensor(fen)
-            self.board_tensors.append(board_tensor)
+        processed = 0
+        next_report = PRECOMPUTE_PROGRESS_INTERVAL
+        tasks = _iter_precompute_tasks(data, self.max_pawns, policy_temperature, precompute_chunk_size)
 
-            # Normalize evaluation
-            eval_norm = normalize_eval(eval_pawns, self.max_pawns)
-            self.eval_tensors.append(torch.tensor([eval_norm], dtype=torch.float32))
+        if num_workers == 1:
+            for task in tasks:
+                result = _precompute_dataset_chunk(task)
+                processed += _copy_precomputed_chunk(
+                    result,
+                    board_tensors,
+                    eval_tensors,
+                    policy_indices,
+                    policy_weights,
+                    has_policy,
+                    legal_move_indices,
+                )
+                next_report = _print_precompute_progress(processed, total_positions, next_report)
+        else:
+            # Keep only a bounded number of chunks in flight to avoid queuing many
+            # large serialized results while still keeping all CPUs busy.
+            max_pending = num_workers * 2
+            try:
+                mp_context = mp.get_context('fork')
+            except ValueError:
+                mp_context = None
 
-            # Compute sparse policy targets
-            if moves:
-                sparse_result = moves_to_policy_sparse(moves, scores, policy_temperature)
-                if sparse_result is not None:
-                    indices, weights = sparse_result
-                    self.policy_indices.append(indices)
-                    self.policy_weights.append(weights)
-                    self.has_policy.append(True)
-                else:
-                    # No valid moves - use placeholder
-                    self.policy_indices.append(np.full(MAX_POLICY_MOVES, -1, dtype=np.int32))
-                    self.policy_weights.append(np.zeros(MAX_POLICY_MOVES, dtype=np.float32))
-                    self.has_policy.append(False)
-            else:
-                # No moves provided - use placeholder
-                self.policy_indices.append(np.full(MAX_POLICY_MOVES, -1, dtype=np.int32))
-                self.policy_weights.append(np.zeros(MAX_POLICY_MOVES, dtype=np.float32))
-                self.has_policy.append(False)
+            with ProcessPoolExecutor(max_workers=num_workers, mp_context=mp_context) as executor:
+                pending = set()
 
-            # Always compute legal move indices (used for policy masking)
-            legal_indices = get_legal_move_indices(fen)
-            self.legal_move_indices.append(legal_indices)
+                def submit_next() -> bool:
+                    try:
+                        task = next(tasks)
+                    except StopIteration:
+                        return False
+                    pending.add(executor.submit(_precompute_dataset_chunk, task))
+                    return True
 
-            # Progress report every 500K positions
-            if (i + 1) % 500_000 == 0:
-                print(f"  Processed {i + 1:,} / {len(data):,} positions...")
+                for _ in range(max_pending):
+                    if not submit_next():
+                        break
 
-        # Stack into single tensors for efficiency
-        self.board_tensors = torch.stack(self.board_tensors)
-        self.eval_tensors = torch.stack(self.eval_tensors)
-        self.policy_indices = torch.from_numpy(np.stack(self.policy_indices))  # (N, MAX_POLICY_MOVES) int32
-        self.policy_weights = torch.from_numpy(np.stack(self.policy_weights))  # (N, MAX_POLICY_MOVES) float32
-        self.has_policy = torch.tensor(self.has_policy, dtype=torch.bool)
+                while pending:
+                    done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        result = future.result()
+                        processed += _copy_precomputed_chunk(
+                            result,
+                            board_tensors,
+                            eval_tensors,
+                            policy_indices,
+                            policy_weights,
+                            has_policy,
+                            legal_move_indices,
+                        )
+                        next_report = _print_precompute_progress(processed, total_positions, next_report)
+                        submit_next()
 
-        self.legal_move_indices = torch.from_numpy(np.stack(self.legal_move_indices))  # (N, MAX_LEGAL_MOVES) int16
+        # Wrap numpy storage in tensors without copying.
+        self.board_tensors = torch.from_numpy(board_tensors)
+        self.eval_tensors = torch.from_numpy(eval_tensors)
+        self.policy_indices = torch.from_numpy(policy_indices)  # (N, MAX_POLICY_MOVES) int32
+        self.policy_weights = torch.from_numpy(policy_weights)  # (N, MAX_POLICY_MOVES) float32
+        self.has_policy = torch.from_numpy(has_policy)  # (N,) bool
+        self.legal_move_indices = torch.from_numpy(legal_move_indices)  # (N, MAX_LEGAL_MOVES) int16
 
         policy_count = self.has_policy.sum().item()
         print(f"Done. Board tensors shape: {self.board_tensors.shape}")
         print(f"Policy indices shape: {self.policy_indices.shape} (sparse, ~{self.policy_indices.nbytes / 1e6:.1f} MB)")
         print(f"Legal move indices shape: {self.legal_move_indices.shape} (sparse, ~{self.legal_move_indices.nbytes / 1e6:.1f} MB)")
-        print(f"Positions with policy targets: {policy_count:,} / {len(data):,} ({100*policy_count/len(data):.1f}%)")
+        policy_pct = 100 * policy_count / total_positions if total_positions else 0.0
+        print(f"Positions with policy targets: {policy_count:,} / {total_positions:,} ({policy_pct:.1f}%)")
 
     def __len__(self) -> int:
         return len(self.board_tensors)
@@ -943,7 +1103,7 @@ def compute_topk_accuracy(
     target_best_flat = policy_indices[batch_arange, best_slot].long()  # (batch,)
 
     # Use legal-move-masked logits for top-k predictions
-    logits_flat = policy_logits.view(batch_size, -1)
+    logits_flat = policy_logits.reshape(batch_size, -1)
     masked_logits = logits_flat.masked_fill(legal_move_masks == 0, float('-inf'))
     _, top3_pred = masked_logits.topk(k=3, dim=1)
     _, top5_pred = masked_logits.topk(k=5, dim=1)
@@ -976,7 +1136,9 @@ class Trainer:
         device: str = 'auto',
         learning_rate: float = 0.001,
         weight_decay: float = 1e-4,
-        policy_weight: float = 0.1
+        policy_weight: float = 0.1,
+        use_amp: bool = True,
+        channels_last: bool = True
     ):
         """
         Args:
@@ -985,6 +1147,8 @@ class Trainer:
             learning_rate: Initial learning rate
             weight_decay: L2 regularization weight
             policy_weight: Weight for policy loss relative to value loss
+            use_amp: Use bfloat16 autocast on CUDA devices
+            channels_last: Store model/input tensors in channels-last format on CUDA
         """
         if device == 'auto':
             if torch.cuda.is_available():
@@ -997,6 +1161,13 @@ class Trainer:
             self.device = torch.device(device)
 
         self.model = model.to(self.device)
+        self.use_amp = use_amp and self.device.type == 'cuda'
+        self.channels_last = channels_last and self.device.type == 'cuda'
+        if self.device.type == 'cuda':
+            torch.backends.cudnn.benchmark = True
+            torch.set_float32_matmul_precision('high')
+        if self.channels_last:
+            self.model = self.model.to(memory_format=torch.channels_last)
         self.policy_weight = policy_weight
         self.optimizer = torch.optim.Adam(
             model.parameters(),
@@ -1007,6 +1178,27 @@ class Trainer:
             self.optimizer, mode='min', factor=0.5, patience=5
         )
         self.value_criterion = nn.SmoothL1Loss(beta=0.2)
+
+    def _autocast_context(self):
+        if self.use_amp:
+            return torch.autocast(device_type='cuda', dtype=torch.bfloat16)
+        return nullcontext()
+
+    def _move_batch_to_device(self, batch):
+        boards, evals, policy_indices, policy_weights, has_policy, legal_move_indices = batch
+        non_blocking = self.device.type == 'cuda'
+        if self.channels_last:
+            boards = boards.to(self.device, non_blocking=non_blocking, memory_format=torch.channels_last)
+        else:
+            boards = boards.to(self.device, non_blocking=non_blocking)
+        return (
+            boards,
+            evals.to(self.device, non_blocking=non_blocking),
+            policy_indices.to(self.device, non_blocking=non_blocking),
+            policy_weights.to(self.device, non_blocking=non_blocking),
+            has_policy.to(self.device, non_blocking=non_blocking),
+            legal_move_indices.to(self.device, non_blocking=non_blocking),
+        )
 
     def _compute_policy_loss(
         self,
@@ -1042,7 +1234,7 @@ class Trainer:
             return torch.tensor(0.0, device=self.device)
 
         # Flatten logits to (batch, 73*8*8) = (batch, 4672)
-        policy_logits_flat = policy_logits.view(batch_size, -1)
+        policy_logits_flat = policy_logits.float().reshape(batch_size, -1)
 
         # Apply legal move masking: set illegal move logits to -inf before softmax
         # This ensures probability mass is only distributed among legal moves
@@ -1129,30 +1321,25 @@ class Trainer:
         total_topk_samples = 0
 
         for batch_idx, batch in enumerate(dataloader):
-            boards, evals, policy_indices, policy_weights, has_policy, legal_move_indices = batch
-            boards = boards.to(self.device)
-            evals = evals.to(self.device)
-            policy_indices = policy_indices.to(self.device)
-            policy_weights = policy_weights.to(self.device)
-            has_policy = has_policy.to(self.device)
-            legal_move_indices = legal_move_indices.to(self.device)
+            boards, evals, policy_indices, policy_weights, has_policy, legal_move_indices = self._move_batch_to_device(batch)
 
             # Convert sparse legal move indices to dense mask on GPU
             legal_move_masks = legal_indices_to_mask(legal_move_indices, self.device)
 
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
 
-            # Forward pass
-            value_pred, policy_logits = self.model(boards)
+            with self._autocast_context():
+                # Forward pass
+                value_pred, policy_logits = self.model(boards)
 
-            # Value loss
-            value_loss = self.value_criterion(value_pred, evals)
+                # Value loss
+                value_loss = self.value_criterion(value_pred.float(), evals.float())
 
-            # Policy loss
-            policy_loss = self._compute_policy_loss(
-                policy_logits, policy_indices, policy_weights, has_policy, legal_move_masks
-            )
-            loss = value_loss + self.policy_weight * policy_loss
+                # Policy loss
+                policy_loss = self._compute_policy_loss(
+                    policy_logits, policy_indices, policy_weights, has_policy, legal_move_masks
+                )
+                loss = value_loss + self.policy_weight * policy_loss
             total_policy_loss += policy_loss.item()
             total_policy_samples += has_policy.sum().item()
 
@@ -1165,7 +1352,7 @@ class Trainer:
 
             # Calculate stratified accuracy metrics and top-k policy accuracy
             with torch.no_grad():
-                pred_pawns = denormalize_eval(value_pred.cpu().numpy())
+                pred_pawns = denormalize_eval(value_pred.float().cpu().numpy())
                 true_pawns = denormalize_eval(evals.cpu().numpy())
 
                 w05, b1_s, w1, b2_s, w3, b3_s, w90, b4_s = compute_stratified_accuracy(pred_pawns, true_pawns)
@@ -1239,28 +1426,23 @@ class Trainer:
 
         with torch.no_grad():
             for batch in dataloader:
-                boards, evals, policy_indices, policy_weights, has_policy, legal_move_indices = batch
-                boards = boards.to(self.device)
-                evals = evals.to(self.device)
-                policy_indices = policy_indices.to(self.device)
-                policy_weights = policy_weights.to(self.device)
-                has_policy = has_policy.to(self.device)
-                legal_move_indices = legal_move_indices.to(self.device)
+                boards, evals, policy_indices, policy_weights, has_policy, legal_move_indices = self._move_batch_to_device(batch)
 
                 # Convert sparse legal move indices to dense mask on GPU
                 legal_move_masks = legal_indices_to_mask(legal_move_indices, self.device)
 
-                # Forward pass
-                value_pred, policy_logits = self.model(boards)
+                with self._autocast_context():
+                    # Forward pass
+                    value_pred, policy_logits = self.model(boards)
 
-                # Value loss
-                value_loss = self.value_criterion(value_pred, evals)
+                    # Value loss
+                    value_loss = self.value_criterion(value_pred.float(), evals.float())
 
-                # Policy loss
-                policy_loss = self._compute_policy_loss(
-                    policy_logits, policy_indices, policy_weights, has_policy, legal_move_masks
-                )
-                loss = value_loss + self.policy_weight * policy_loss
+                    # Policy loss
+                    policy_loss = self._compute_policy_loss(
+                        policy_logits, policy_indices, policy_weights, has_policy, legal_move_masks
+                    )
+                    loss = value_loss + self.policy_weight * policy_loss
                 total_policy_loss += policy_loss.item()
                 total_policy_samples += has_policy.sum().item()
 
@@ -1269,7 +1451,7 @@ class Trainer:
                 num_batches += 1
 
                 # Calculate absolute error in pawn units and stratified accuracy
-                pred_pawns = denormalize_eval(value_pred.cpu().numpy())
+                pred_pawns = denormalize_eval(value_pred.float().cpu().numpy())
                 true_pawns = denormalize_eval(evals.cpu().numpy())
                 abs_errors = np.abs(pred_pawns - true_pawns)
                 total_abs_error += np.sum(abs_errors)
@@ -1296,22 +1478,21 @@ class Trainer:
 
                 # Entropy and max_prob of policy distribution over legal moves
                 batch_size = boards.size(0)
-                logits_flat = policy_logits.view(batch_size, -1)
-                mask_flat = legal_move_masks.view(batch_size, -1)
+                logits_flat = policy_logits.float().reshape(batch_size, -1)
+                mask_flat = legal_move_masks.reshape(batch_size, -1)
+                has_legal = mask_flat.sum(dim=1) > 0
+                if has_legal.any():
+                    masked_logits = logits_flat.masked_fill(mask_flat == 0, float('-inf'))
+                    valid_logits = masked_logits[has_legal]
+                    probs = F.softmax(valid_logits, dim=1)
+                    log_probs = torch.log2(torch.clamp(probs, min=1e-10))
+                    entropies = -(probs * log_probs).sum(dim=1)
+                    max_probs = probs.max(dim=1).values
 
-                for i in range(batch_size):
-                    legal_mask_i = mask_flat[i] > 0
-                    n_legal = legal_mask_i.sum().item()
-                    if n_legal > 0:
-                        legal_logits_i = logits_flat[i][legal_mask_i]
-                        probs_i = F.softmax(legal_logits_i, dim=0)
-                        log_probs_i = torch.log2(torch.clamp(probs_i, min=1e-10))
-                        entropy_i = -(probs_i * log_probs_i).sum().item()
-                        max_prob_i = probs_i.max().item()
-                        total_entropy += entropy_i
-                        total_max_prob += max_prob_i
-                        total_entropy_samples += 1
-                        entropy_values.append(entropy_i)
+                    total_entropy += entropies.sum().item()
+                    total_max_prob += max_probs.sum().item()
+                    total_entropy_samples += entropies.numel()
+                    entropy_values.extend(entropies.cpu().tolist())
 
                 num_samples += boards.size(0)
 
@@ -1640,18 +1821,24 @@ def main():
     # CONFIGURATION - Modify these variables as needed
     # ==========================================================================
     TRAIN_DATA = 'combined_training_data.csv'  # Local training data CSV path
-    VAL_DATA = 'combined_test.csv'             # Local validation data CSV path
+    VAL_DATA = 'combined_test_data.csv'             # Local validation data CSV path
     EPOCHS = 100                          # Number of training epochs
-    BATCH_SIZE = 2048                     # Batch size (optimized for A10G 24GB GPU)
-    LEARNING_RATE = 0.001                 # Learning rate
-    SAVE_PATH = 'attempt_13.pt'           # Local model checkpoint path
+    BATCH_SIZE = _get_env_int('CHESS_BATCH_SIZE', 2048)  # H100 can likely use 4096-8192
+    LEARNING_RATE = 0.0000625                # Learning rate
+    #LEARNING_RATE = 0.001                 # Learning rate
+    SAVE_PATH = 'attempt_14b.pt'           # Local model checkpoint path
     DEVICE = 'auto'                       # Device: 'cpu', 'cuda', 'mps', or 'auto'
     POLICY_WEIGHT = 0.1                   # Weight for policy loss
     POLICY_TEMPERATURE = 1.0              # Softmax temperature for policy targets
+    DATALOADER_WORKERS = _get_env_int('CHESS_DATALOADER_WORKERS', min(8, os.cpu_count() or 1), minimum=0)
+    DATALOADER_PREFETCH = _get_env_int('CHESS_DATALOADER_PREFETCH', 4)
+    PIN_MEMORY = os.environ.get('CHESS_PIN_MEMORY', '1') != '0'
+    USE_AMP = os.environ.get('CHESS_USE_AMP', '1') != '0'
+    CHANNELS_LAST = os.environ.get('CHESS_CHANNELS_LAST', '1') != '0'
 
     # Fine-tuning options
-    CHECKPOINT_PATH = None                # Local checkpoint path (None = train from scratch)
-    # CHECKPOINT_PATH = 'chess_model_epoch057.pt'  # Example: uncomment to fine-tune
+    #CHECKPOINT_PATH = None                # Local checkpoint path (None = train from scratch)
+    CHECKPOINT_PATH = 'attempt_14_epoch077.pt'  # Example: uncomment to fine-tune
     # ==========================================================================
 
     if CHECKPOINT_PATH:
@@ -1659,6 +1846,11 @@ def main():
         print(f"Learning rate: {LEARNING_RATE} (recommend 0.0001 for fine-tuning)")
     else:
         print("Mode: Training from scratch")
+    print(f"Batch size: {BATCH_SIZE}")
+    print(f"DataLoader workers: {DATALOADER_WORKERS}, pin_memory: {PIN_MEMORY}")
+    if DATALOADER_WORKERS > 0:
+        print(f"DataLoader prefetch factor: {DATALOADER_PREFETCH}")
+    print(f"CUDA AMP: {USE_AMP}, channels_last: {CHANNELS_LAST}")
     print("=" * 80)
 
     # Load training data from local CSV
@@ -1679,17 +1871,25 @@ def main():
         policy_temperature=POLICY_TEMPERATURE
     )
 
+    loader_kwargs = {
+        'num_workers': DATALOADER_WORKERS,
+        'pin_memory': PIN_MEMORY,
+    }
+    if DATALOADER_WORKERS > 0:
+        loader_kwargs['persistent_workers'] = True
+        loader_kwargs['prefetch_factor'] = DATALOADER_PREFETCH
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
         shuffle=True,
-        num_workers=0
+        **loader_kwargs
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=BATCH_SIZE,
         shuffle=False,
-        num_workers=0
+        **loader_kwargs
     )
 
     # Create model and trainer
@@ -1702,7 +1902,9 @@ def main():
         model,
         device=DEVICE,
         learning_rate=LEARNING_RATE,
-        policy_weight=POLICY_WEIGHT
+        policy_weight=POLICY_WEIGHT,
+        use_amp=USE_AMP,
+        channels_last=CHANNELS_LAST
     )
 
     # Load checkpoint for fine-tuning if specified
