@@ -71,13 +71,59 @@ def pick_engine_color(mode: str, game_idx: int) -> chess.Color:
 
 
 def terminal_score_white(board: chess.Board) -> Optional[float]:
-    """Terminal value in WHITE's perspective, or None if not terminal."""
+    """Terminal value in WHITE's perspective, or None if not terminal.
+
+    Note: 3-fold repetition is NOT detected here, because the board passed in
+    was built via copy(stack=False).push(move) — its move stack is empty, so
+    python-chess can't see prior occurrences. Repetition is handled separately
+    by `_check_repetition_terminal`, which uses the explicit game/path history.
+    """
     if board.is_checkmate():
         # Side to move is checkmated -> they lose.
         return TERMINAL_LOSS_WHITE if board.turn == chess.WHITE else TERMINAL_WIN_WHITE
     if board.is_game_over(claim_draw=True):
         return TERMINAL_DRAW
     return None
+
+
+def _position_key(board: chess.Board) -> str:
+    """FIDE-correct repetition key: pieces + side-to-move + castling + en-passant.
+
+    Drops the halfmove and fullmove counters from the FEN. Two positions are
+    "the same" for repetition purposes iff their `_position_key` matches.
+    Using `board_fen()` (piece placement only) is too loose: it would consider
+    a post-castling position equal to the start position even though castling
+    rights differ.
+    """
+    return board.fen().rsplit(" ", 2)[0]
+
+
+def _check_repetition_terminal(
+    node: "MCTSNode",
+    game_history: List[str],
+    path_below_root: List["MCTSNode"],
+) -> None:
+    """Set node.is_terminal/terminal_value=DRAW iff its position is the 3rd occurrence.
+
+    Caller guarantees node.board is set, and that node's own position is NOT
+    represented in either `game_history` or `path_below_root` (we add +1 for
+    it here). Specifically:
+      - `game_history` is the list of played-position keys; for descents below
+        root, this includes root's key as the last entry, which is OK because
+        root sits at path[0], not in path_below_root.
+      - `path_below_root` is the MCTS path from root's first child down to
+        (but not including) `node`. Root MUST be excluded — otherwise root
+        would be double-counted (it's already the tail of `game_history`).
+    """
+    key = _position_key(node.board)
+    game_count = sum(1 for k in game_history if k == key)
+    path_count = sum(
+        1 for n in path_below_root
+        if n.board is not None and _position_key(n.board) == key
+    )
+    if game_count + path_count + 1 >= 3:
+        node.is_terminal = True
+        node.terminal_value = TERMINAL_DRAW
 
 
 # =============================================================================
@@ -136,7 +182,11 @@ class MCTSNode:
         self.virtual_loss = 0
 
 
-def _materialize(node: MCTSNode, game_history: List[str], path: List[MCTSNode]) -> None:
+def _materialize(
+    node: MCTSNode,
+    game_history: List[str],
+    path_to_parent: List[MCTSNode],
+) -> None:
     """Build node.board from its parent if it's a lazy stub, and detect terminal status.
 
     No-op if the node is already materialized. Caller must guarantee
@@ -145,9 +195,14 @@ def _materialize(node: MCTSNode, game_history: List[str], path: List[MCTSNode]) 
     moving into it.
 
     Args:
-        node: The node to materialize
-        game_history: List of position hashes from the actual game (before MCTS)
-        path: Current MCTS path from root to this node (for detecting repetitions in the tree)
+        node: The node to materialize.
+        game_history: Position keys from the actual played game. The last entry
+            is expected to be root's key (the position before the upcoming move).
+            Node's own key must NOT be present.
+        path_to_parent: MCTS path from root through node's parent (i.e. everything
+            traversed during this descent so far, excluding `node`). The
+            repetition counter skips path_to_parent[0] (the root) because root
+            is already represented in `game_history`'s tail.
     """
     if node.board is not None:
         return
@@ -156,33 +211,14 @@ def _materialize(node: MCTSNode, game_history: List[str], path: List[MCTSNode]) 
     new_board.push(node.parent_move)
     node.board = new_board
 
-    # Check for normal terminal conditions first
     term = terminal_score_white(new_board)
     if term is not None:
         node.is_terminal = True
         node.terminal_value = term
         return
 
-    # Check for repetition draw
-    # Get position hash for the new board (use board_fen to ignore move counters)
-    current_fen = new_board.board_fen()
-
-    # Count occurrences in game history
-    game_count = sum(1 for fen in game_history if fen == current_fen)
-
-    # Count occurrences in current MCTS path (excluding the node we just materialized)
-    path_count = 0
-    for path_node in path[:-1]:  # Exclude last element which is the current node
-        if path_node.board is not None:
-            if path_node.board.board_fen() == current_fen:
-                path_count += 1
-
-    total_count = game_count + path_count + 1  # +1 for current position
-
-    # If this position has occurred 3+ times, it's a draw by repetition
-    if total_count >= 3:
-        node.is_terminal = True
-        node.terminal_value = TERMINAL_DRAW
+    # Repetition: skip path[0] (root) — already counted in game_history's tail.
+    _check_repetition_terminal(node, game_history, path_to_parent[1:])
 
 
 # =============================================================================
@@ -300,19 +336,46 @@ class MCTSEngine:
         If `move` isn't in the tree (unvisited branch), build a fresh root.
 
         Args:
-            root: Current root node
-            move: Move to advance by
-            game_history: Game history (for repetition detection during materialization)
+            root: Current root node.
+            move: Move to advance by.
+            game_history: Played-position keys. Caller appends the post-move key
+                BEFORE calling us, so `game_history[-1]` IS the new root's key.
+                We strip that tail before counting to avoid double-counting.
         """
+        # The caller has just appended the new root's position to game_history.
+        # All terminal checks below operate on history WITHOUT that tail entry,
+        # since `_check_repetition_terminal` accounts for the new node with +1.
+        history_excl_self = game_history[:-1]
+
         if move in root.children:
             new_root = root.children[move]
-            # Must materialize before clearing parent — _materialize needs parent.board.
-            # Pass empty path since we're just materializing a single node, not descending
-            _materialize(new_root, game_history, [root])
+            if new_root.board is None:
+                # Stub: materialize (will recompute terminal flags from scratch).
+                _materialize(new_root, history_excl_self, [root])
+            else:
+                # Already materialized in a prior search. Refresh terminal status:
+                # repetition is history-dependent, so a previously non-terminal
+                # node may now be a 3-fold (or vice versa). Intrinsic terminals
+                # (mate/stalemate/insufficient material/50-move) are stable, so
+                # we re-derive them too rather than trust the stored flag.
+                intrinsic = terminal_score_white(new_root.board)
+                if intrinsic is not None:
+                    new_root.is_terminal = True
+                    new_root.terminal_value = intrinsic
+                else:
+                    new_root.is_terminal = False
+                    new_root.terminal_value = None
+                    _check_repetition_terminal(new_root, history_excl_self, [])
         else:
             new_board = root.board.copy(stack=False)
             new_board.push(move)
             new_root = MCTSNode(board=new_board)
+            intrinsic = terminal_score_white(new_board)
+            if intrinsic is not None:
+                new_root.is_terminal = True
+                new_root.terminal_value = intrinsic
+            else:
+                _check_repetition_terminal(new_root, history_excl_self, [])
         new_root.parent = None
         new_root.parent_move = None
         return new_root
@@ -410,6 +473,33 @@ class MCTSEngine:
             n.N += 1
             n.W += v_white
 
+    @staticmethod
+    def _is_visit_dominated(
+        root: MCTSNode, n_sims: int, n_done: int, min_sims: int
+    ) -> bool:
+        """Return True iff the argmax-by-visits root child can no longer change.
+
+        Cheap check: scan children once for top and second visit counts. If the
+        top child's lead exceeds the sims still to run, no allocation of those
+        sims to the runner-up could overtake — so we can bail.
+
+        `min_sims` is a floor: the check is suppressed before that many sims
+        complete in this call, to avoid bailing on a tiny early N-disparity.
+        """
+        if min_sims <= 0 or n_done < min_sims or not root.children:
+            return False
+        top_n = -1
+        second_n = -1
+        for c in root.children.values():
+            if c.N > top_n:
+                second_n = top_n
+                top_n = c.N
+            elif c.N > second_n:
+                second_n = c.N
+        if second_n < 0:
+            second_n = 0
+        return top_n - second_n > (n_sims - n_done)
+
     def run_simulations(
         self,
         root: MCTSNode,
@@ -418,32 +508,50 @@ class MCTSEngine:
         cpuct: float,
         fpu_reduction: float,
         game_history: List[str],
+        early_exit_min_sims: int = 0,
     ) -> Dict[str, Any]:
         """Run up to `n_sims` new simulations from `root` (preserving any prior visits).
 
         Args:
-            root: Root node for the search
-            n_sims: Number of simulations to run
-            batch_size: Batch size for leaf evaluation
-            cpuct: PUCT exploration constant
-            fpu_reduction: First-play urgency reduction
-            game_history: List of board_fen() strings from the actual game history
+            root: Root node for the search.
+            n_sims: Number of simulations to run.
+            batch_size: Batch size for leaf evaluation.
+            cpuct: PUCT exploration constant.
+            fpu_reduction: First-play urgency reduction.
+            game_history: List of `_position_key(board)` strings from the actual
+                game history (last entry == root's position).
+            early_exit_min_sims: If > 0, after at least this many sims have
+                completed, bail out as soon as the most-visited root child's
+                lead exceeds the remaining sim budget — i.e. as soon as no
+                possible distribution of remaining visits could change the
+                argmax-by-N move. Provably doesn't change the chosen move.
+                Pass 0 to disable.
         """
         t0 = time.time()
         self._reset_search_stats()
 
-        # Handle terminal root.
-        if root.is_terminal or terminal_score_white(root.board) is not None:
-            term = terminal_score_white(root.board)
-            if term is not None:
-                root.is_terminal = True
-                root.terminal_value = term
+        # Handle terminal root. Distinguish two flavors:
+        #   - intrinsic (mate/stalemate/insufficient material/50-move): terminal
+        #     no matter the history; we can safely return without expanding.
+        #   - stale `is_terminal` flag (e.g. set by a prior repetition check that
+        #     no longer applies): the outer game loop already verified the game
+        #     isn't over via `board.is_game_over(claim_draw=True)`, so if MCTS
+        #     thinks otherwise the flag is stale — clear it and proceed.
+        intrinsic = terminal_score_white(root.board)
+        if intrinsic is not None:
+            root.is_terminal = True
+            root.terminal_value = intrinsic
             return {
                 "elapsed": time.time() - t0,
                 "simulations": 0,
                 "evaluated_positions": 0,
                 "batched_eval_calls": 0,
+                "early_exit": False,
             }
+        if root.is_terminal:
+            # Stale terminal flag (rep check no longer true given current history).
+            root.is_terminal = False
+            root.terminal_value = None
 
         # Expand root if needed (single forward pass, policy only).
         if not root.expanded:
@@ -454,7 +562,15 @@ class MCTSEngine:
             self.evaluated_positions += 1
 
         n_done = 0
+        early_exit_triggered = False
         while n_done < n_sims:
+            # Visit-domination early exit (top of every iteration). Picks up the
+            # post-batch state from the previous iteration and any pre-existing
+            # tree-reuse imbalance.
+            if self._is_visit_dominated(root, n_sims, n_done, early_exit_min_sims):
+                early_exit_triggered = True
+                break
+
             target = min(batch_size, n_sims - n_done)
             batch_leaves: List[MCTSNode] = []
             batch_paths: List[List[MCTSNode]] = []
@@ -466,6 +582,14 @@ class MCTSEngine:
                 if leaf.is_terminal:
                     self._backprop(path, leaf.terminal_value, undo_virtual_loss=False)
                     n_done += 1
+                    # Check after each terminal-leaf sim too: forced-move positions
+                    # (one legal move that leads to a terminal) hit only this path
+                    # and would otherwise burn through every sim before exiting.
+                    if self._is_visit_dominated(
+                        root, n_sims, n_done, early_exit_min_sims
+                    ):
+                        early_exit_triggered = True
+                        break
                     continue
                 # Apply virtual loss along the path so concurrent descents diverge.
                 for n in path:
@@ -473,6 +597,8 @@ class MCTSEngine:
                 batch_leaves.append(leaf)
                 batch_paths.append(path)
 
+            if early_exit_triggered:
+                break
             if not batch_leaves:
                 # All remaining sims terminated immediately. Done.
                 break
@@ -498,6 +624,8 @@ class MCTSEngine:
                     self._expand_node(leaf, p_arr[i])
 
             # Phase 4: backprop value and undo virtual loss for each batched sim.
+            # The visit-domination early-exit check fires at the top of the next
+            # iteration of this outer loop, so it sees the post-Phase-4 state.
             for leaf, path in zip(batch_leaves, batch_paths):
                 v_white = float(v_arr[leaf_to_idx[id(leaf)]])
                 self._backprop(path, v_white, undo_virtual_loss=True)
@@ -508,6 +636,7 @@ class MCTSEngine:
             "simulations": n_done,
             "evaluated_positions": self.evaluated_positions,
             "batched_eval_calls": self.batched_eval_calls,
+            "early_exit": early_exit_triggered,
         }
 
     # --- top-level move selection ---
@@ -520,26 +649,33 @@ class MCTSEngine:
         cpuct: float,
         fpu_reduction: float,
         game_history: List[str],
+        early_exit_min_sims: int = 0,
     ) -> Tuple[chess.Move, Dict[str, Any]]:
         """Run sims and return the most-visited root move plus stats.
 
         Args:
-            root: Root node for the search
-            n_sims: Number of simulations
-            batch_size: Batch size for evaluation
-            cpuct: PUCT exploration constant
-            fpu_reduction: First-play urgency reduction
-            game_history: List of board_fen() strings from the actual game history
+            root: Root node for the search.
+            n_sims: Number of simulations.
+            batch_size: Batch size for evaluation.
+            cpuct: PUCT exploration constant.
+            fpu_reduction: First-play urgency reduction.
+            game_history: List of `_position_key(board)` strings from the actual
+                game history (last entry == root's position).
+            early_exit_min_sims: See `run_simulations`. 0 disables.
 
         Returns:
             Tuple of (best_move, stats_dict)
 
         stats contains:
           elapsed, simulations, evaluated_positions, batched_eval_calls,
+          early_exit (bool: True iff the visit-domination early-exit fired),
           q_for_mover (Q from the side-to-move's perspective on selected child),
           selected_prior, top_moves: List[(move, visits, prior, Q_white)].
         """
-        sim_stats = self.run_simulations(root, n_sims, batch_size, cpuct, fpu_reduction, game_history)
+        sim_stats = self.run_simulations(
+            root, n_sims, batch_size, cpuct, fpu_reduction, game_history,
+            early_exit_min_sims=early_exit_min_sims,
+        )
 
         if not root.children:
             raise ValueError("Root has no children; no legal move available.")
@@ -635,6 +771,7 @@ def play_one_game(
     max_plies: int,
     verbose: bool,
     progress_callback: Optional[Callable[[int, str, bool], None]] = None,
+    early_exit_min_sims: int = 0,
 ) -> Tuple[chess.pgn.Game, float, float]:
     board = chess.Board()
     game = chess.pgn.Game()
@@ -647,9 +784,14 @@ def play_one_game(
 
     mcts_root: Optional[MCTSNode] = neural.make_root(board) if reuse_tree else None
 
-    # Track position history for repetition detection
-    # Use board_fen() which excludes move counters (only pieces, castling, ep, side-to-move)
-    position_history: List[str] = [board.board_fen()]
+    # Track position history for repetition detection.
+    # Use `_position_key` (FEN minus halfmove/fullmove counters): captures pieces,
+    # side-to-move, castling rights, and en-passant target — exactly the FIDE-rule
+    # equality criterion. `board_fen()` would be wrong: it includes only piece
+    # placement, so e.g. a post-castling king/rook return to e1/h1 would be
+    # falsely considered equal to the starting position despite different
+    # castling rights.
+    position_history: List[str] = [_position_key(board)]
 
     pgn_node = game
     ply = 0
@@ -667,17 +809,20 @@ def play_one_game(
                 cpuct=cpuct,
                 fpu_reduction=fpu_reduction,
                 game_history=position_history,
+                early_exit_min_sims=early_exit_min_sims,
             )
             nn_time_total += search_stats["elapsed"]
+            ee_tag = "*" if search_stats.get("early_exit") else ""
             comment = (
                 f"Q {search_stats['q_for_mover']:+.2f} "
                 f"P {search_stats['selected_prior']:.3f} "
-                f"N {search_stats['root_visits']}"
+                f"N {search_stats['root_visits']}{ee_tag}"
             )
             if verbose:
                 print(f"  Top: {format_top_moves(board, search_stats['top_moves'], 5)}")
                 print(
-                    f"  search: sims={search_stats['simulations']}, "
+                    f"  search: sims={search_stats['simulations']}"
+                    f"{' (early exit)' if search_stats.get('early_exit') else ''}, "
                     f"evaluated={search_stats['evaluated_positions']}, "
                     f"batches={search_stats['batched_eval_calls']}, "
                     f"time={search_stats['elapsed']:.2f}s"
@@ -698,8 +843,8 @@ def play_one_game(
 
         board.push(move)
 
-        # Add new position to history AFTER the move
-        position_history.append(board.board_fen())
+        # Add new position to history AFTER the move.
+        position_history.append(_position_key(board))
 
         if reuse_tree and mcts_root is not None:
             mcts_root = neural.advance_root(mcts_root, move, position_history)
@@ -886,6 +1031,12 @@ def main():
                         help="First-play urgency reduction (subtracted from parent Q for unvisited children).")
     parser.add_argument("--mcts-no-reuse-tree", action="store_true",
                         help="Disable subtree reuse across moves in a game.")
+    parser.add_argument("--mcts-early-exit-min-sims", type=int, default=200,
+                        help="Visit-domination early exit: bail once the most-visited "
+                             "root child's lead exceeds the remaining sim budget. The "
+                             "value is the minimum sims that must complete before the "
+                             "check is allowed to fire (prevents bailing on noise). "
+                             "0 disables. Default 200.")
 
     parser.add_argument("--engine-color", choices=["white", "black", "both", "random"], default="both")
     parser.add_argument("--games", type=int, default=2, help="Games per Stockfish level.")
@@ -906,7 +1057,8 @@ def main():
         "MCTS settings: "
         f"sims={args.mcts_simulations}, batch={args.mcts_batch_size}, "
         f"cpuct={args.mcts_cpuct}, fpu={args.mcts_fpu}, "
-        f"reuse_tree={not args.mcts_no_reuse_tree}"
+        f"reuse_tree={not args.mcts_no_reuse_tree}, "
+        f"early_exit_min_sims={args.mcts_early_exit_min_sims}"
     )
 
     level_min = args.stockfish_level_min
@@ -927,6 +1079,7 @@ def main():
         "stockfish_time": args.stockfish_time,
         "stockfish_depth": args.stockfish_depth,
         "max_plies": args.max_plies,
+        "early_exit_min_sims": args.mcts_early_exit_min_sims,
     }
 
     parallel = max(1, args.parallel_games)
