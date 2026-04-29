@@ -136,13 +136,18 @@ class MCTSNode:
         self.virtual_loss = 0
 
 
-def _materialize(node: MCTSNode) -> None:
+def _materialize(node: MCTSNode, game_history: List[str], path: List[MCTSNode]) -> None:
     """Build node.board from its parent if it's a lazy stub, and detect terminal status.
 
     No-op if the node is already materialized. Caller must guarantee
     node.parent.board is set; this is true by construction whenever we are
     descending from root, since each step materializes the child before
     moving into it.
+
+    Args:
+        node: The node to materialize
+        game_history: List of position hashes from the actual game (before MCTS)
+        path: Current MCTS path from root to this node (for detecting repetitions in the tree)
     """
     if node.board is not None:
         return
@@ -150,10 +155,34 @@ def _materialize(node: MCTSNode) -> None:
     new_board = parent.board.copy(stack=False)
     new_board.push(node.parent_move)
     node.board = new_board
+
+    # Check for normal terminal conditions first
     term = terminal_score_white(new_board)
     if term is not None:
         node.is_terminal = True
         node.terminal_value = term
+        return
+
+    # Check for repetition draw
+    # Get position hash for the new board (use board_fen to ignore move counters)
+    current_fen = new_board.board_fen()
+
+    # Count occurrences in game history
+    game_count = sum(1 for fen in game_history if fen == current_fen)
+
+    # Count occurrences in current MCTS path (excluding the node we just materialized)
+    path_count = 0
+    for path_node in path[:-1]:  # Exclude last element which is the current node
+        if path_node.board is not None:
+            if path_node.board.board_fen() == current_fen:
+                path_count += 1
+
+    total_count = game_count + path_count + 1  # +1 for current position
+
+    # If this position has occurred 3+ times, it's a draw by repetition
+    if total_count >= 3:
+        node.is_terminal = True
+        node.terminal_value = TERMINAL_DRAW
 
 
 # =============================================================================
@@ -265,15 +294,21 @@ class MCTSEngine:
     def make_root(self, board: chess.Board) -> MCTSNode:
         return MCTSNode(board=board.copy(stack=False))
 
-    def advance_root(self, root: MCTSNode, move: chess.Move) -> MCTSNode:
+    def advance_root(self, root: MCTSNode, move: chess.Move, game_history: List[str]) -> MCTSNode:
         """Return the child for `move` as the new root, preserving its subtree.
 
         If `move` isn't in the tree (unvisited branch), build a fresh root.
+
+        Args:
+            root: Current root node
+            move: Move to advance by
+            game_history: Game history (for repetition detection during materialization)
         """
         if move in root.children:
             new_root = root.children[move]
             # Must materialize before clearing parent — _materialize needs parent.board.
-            _materialize(new_root)
+            # Pass empty path since we're just materializing a single node, not descending
+            _materialize(new_root, game_history, [root])
         else:
             new_board = root.board.copy(stack=False)
             new_board.push(move)
@@ -349,6 +384,7 @@ class MCTSEngine:
         root: MCTSNode,
         cpuct: float,
         fpu_reduction: float,
+        game_history: List[str],
     ) -> Tuple[MCTSNode, List[MCTSNode]]:
         """Descend by PUCT until we hit an unexpanded or terminal node.
 
@@ -361,7 +397,7 @@ class MCTSEngine:
             child = self._select_child(node, cpuct, fpu_reduction)
             if child is None:
                 break
-            _materialize(child)
+            _materialize(child, game_history, path)
             node = child
             path.append(node)
         return node, path
@@ -381,8 +417,18 @@ class MCTSEngine:
         batch_size: int,
         cpuct: float,
         fpu_reduction: float,
+        game_history: List[str],
     ) -> Dict[str, Any]:
-        """Run up to `n_sims` new simulations from `root` (preserving any prior visits)."""
+        """Run up to `n_sims` new simulations from `root` (preserving any prior visits).
+
+        Args:
+            root: Root node for the search
+            n_sims: Number of simulations to run
+            batch_size: Batch size for leaf evaluation
+            cpuct: PUCT exploration constant
+            fpu_reduction: First-play urgency reduction
+            game_history: List of board_fen() strings from the actual game history
+        """
         t0 = time.time()
         self._reset_search_stats()
 
@@ -416,7 +462,7 @@ class MCTSEngine:
             # Phase 1: collect a batch of non-terminal leaves; resolve terminal
             # leaves immediately (no NN call needed).
             while len(batch_leaves) < target and (n_done + len(batch_leaves)) < n_sims:
-                leaf, path = self._descend(root, cpuct, fpu_reduction)
+                leaf, path = self._descend(root, cpuct, fpu_reduction, game_history)
                 if leaf.is_terminal:
                     self._backprop(path, leaf.terminal_value, undo_virtual_loss=False)
                     n_done += 1
@@ -473,15 +519,27 @@ class MCTSEngine:
         batch_size: int,
         cpuct: float,
         fpu_reduction: float,
+        game_history: List[str],
     ) -> Tuple[chess.Move, Dict[str, Any]]:
         """Run sims and return the most-visited root move plus stats.
+
+        Args:
+            root: Root node for the search
+            n_sims: Number of simulations
+            batch_size: Batch size for evaluation
+            cpuct: PUCT exploration constant
+            fpu_reduction: First-play urgency reduction
+            game_history: List of board_fen() strings from the actual game history
+
+        Returns:
+            Tuple of (best_move, stats_dict)
 
         stats contains:
           elapsed, simulations, evaluated_positions, batched_eval_calls,
           q_for_mover (Q from the side-to-move's perspective on selected child),
           selected_prior, top_moves: List[(move, visits, prior, Q_white)].
         """
-        sim_stats = self.run_simulations(root, n_sims, batch_size, cpuct, fpu_reduction)
+        sim_stats = self.run_simulations(root, n_sims, batch_size, cpuct, fpu_reduction, game_history)
 
         if not root.children:
             raise ValueError("Root has no children; no legal move available.")
@@ -589,6 +647,10 @@ def play_one_game(
 
     mcts_root: Optional[MCTSNode] = neural.make_root(board) if reuse_tree else None
 
+    # Track position history for repetition detection
+    # Use board_fen() which excludes move counters (only pieces, castling, ep, side-to-move)
+    position_history: List[str] = [board.board_fen()]
+
     pgn_node = game
     ply = 0
     nn_time_total = 0.0
@@ -604,6 +666,7 @@ def play_one_game(
                 batch_size=mcts_batch_size,
                 cpuct=cpuct,
                 fpu_reduction=fpu_reduction,
+                game_history=position_history,
             )
             nn_time_total += search_stats["elapsed"]
             comment = (
@@ -634,8 +697,12 @@ def play_one_game(
             print(f"{move_prefix}{san}")
 
         board.push(move)
+
+        # Add new position to history AFTER the move
+        position_history.append(board.board_fen())
+
         if reuse_tree and mcts_root is not None:
-            mcts_root = neural.advance_root(mcts_root, move)
+            mcts_root = neural.advance_root(mcts_root, move, position_history)
         pgn_node = pgn_node.add_variation(move)
         if comment:
             pgn_node.comment = comment
