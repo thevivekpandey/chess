@@ -455,12 +455,23 @@ def get_top_moves_from_policy(
     Extract top-k moves from policy logits.
 
     Args:
-        policy_logits: Array of shape (73, 8, 8)
+        policy_logits: Array of shape (73, 8, 8) or (batch, 73, 8, 8)
         top_k: Number of top moves to return
 
     Returns:
         List of (move_uci, probability) tuples, sorted by probability descending
+        If batch input, returns list of lists
     """
+    # Convert torch tensor to numpy if needed
+    if torch.is_tensor(policy_logits):
+        policy_logits = policy_logits.cpu().numpy()
+
+    # Handle batch dimension
+    if policy_logits.ndim == 4:
+        # Batch of policies - return list of results for each
+        return [get_top_moves_from_policy(policy_logits[i], top_k)
+                for i in range(policy_logits.shape[0])]
+
     # Apply softmax to get probabilities
     flat_logits = policy_logits.flatten()
     exp_logits = np.exp(flat_logits - np.max(flat_logits))
