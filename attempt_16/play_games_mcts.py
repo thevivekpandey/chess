@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
 """
-Play chess interactively against the trained neural chess engine using
+Play games between Stockfish and the trained neural chess engine, using
 AlphaZero-style MCTS (PUCT) with leaf-parallel batched NN evaluation.
 
-The human player enters moves in SAN (Standard Algebraic Notation) on the console.
-The engine displays the board, top move candidates, and evaluation after each move.
+Mirrors play_games.py (Stockfish levels, parallel-games pool, progress
+snapshots, NN/SF time accounting) but replaces the BFS-pruned minimax search
+with a real MCTS:
+  - Node values and Q stored from WHITE's perspective (matches the value head).
+  - Selection uses PUCT: argmax_c [ Q_for_player(c) + cpuct * P(c) * sqrt(N) / (1 + N(c)) ].
+  - Leaf parallelism via virtual loss: each batch collects up to `batch_size`
+    leaves with virtual loss applied along their paths, runs ONE batched
+    forward pass for value+policy, expands all leaves, then backprops and
+    undoes virtual loss.
+  - Subtree reuse across consecutive moves in a game (engine and opponent).
 
 Usage example:
-  ~/myvenv/bin/python play_games_manual_mcts.py \
+  ~/myvenv/bin/python play_games_mcts.py \
       --model attempt_14_epoch077.pt \
-      --engine-color black \
-      --mcts-simulations 800 --mcts-batch-size 16 --mcts-cpuct 2.0
+      --stockfish-level-min 0 --stockfish-level-max 8 \
+      --games 5 --engine-color both \
+      --mcts-simulations 800 --mcts-batch-size 16 --mcts-cpuct 2.0 \
+      --stockfish-time 2 --parallel-games 16
 """
 
 import argparse
 import glob
 import math
+import multiprocessing as mp
 import os
+import random
+import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import chess
+import chess.engine
 import chess.pgn
 import numpy as np
 import torch
@@ -44,6 +58,16 @@ def find_latest_model() -> str:
     raise FileNotFoundError(
         "No model checkpoint found. Pass --model, or put attempt_*_epoch*.pt here."
     )
+
+
+def pick_engine_color(mode: str, game_idx: int) -> chess.Color:
+    if mode == "white":
+        return chess.WHITE
+    if mode == "black":
+        return chess.BLACK
+    if mode == "both":
+        return chess.WHITE if game_idx % 2 == 0 else chess.BLACK
+    return random.choice([chess.WHITE, chess.BLACK])
 
 
 def terminal_score_white(board: chess.Board) -> Optional[float]:
@@ -449,6 +473,33 @@ class MCTSEngine:
             n.N += 1
             n.W += v_white
 
+    @staticmethod
+    def _is_visit_dominated(
+        root: MCTSNode, n_sims: int, n_done: int, min_sims: int
+    ) -> bool:
+        """Return True iff the argmax-by-visits root child can no longer change.
+
+        Cheap check: scan children once for top and second visit counts. If the
+        top child's lead exceeds the sims still to run, no allocation of those
+        sims to the runner-up could overtake — so we can bail.
+
+        `min_sims` is a floor: the check is suppressed before that many sims
+        complete in this call, to avoid bailing on a tiny early N-disparity.
+        """
+        if min_sims <= 0 or n_done < min_sims or not root.children:
+            return False
+        top_n = -1
+        second_n = -1
+        for c in root.children.values():
+            if c.N > top_n:
+                second_n = top_n
+                top_n = c.N
+            elif c.N > second_n:
+                second_n = c.N
+        if second_n < 0:
+            second_n = 0
+        return top_n - second_n > (n_sims - n_done)
+
     def run_simulations(
         self,
         root: MCTSNode,
@@ -457,6 +508,7 @@ class MCTSEngine:
         cpuct: float,
         fpu_reduction: float,
         game_history: List[str],
+        early_exit_min_sims: int = 0,
     ) -> Dict[str, Any]:
         """Run up to `n_sims` new simulations from `root` (preserving any prior visits).
 
@@ -468,6 +520,12 @@ class MCTSEngine:
             fpu_reduction: First-play urgency reduction.
             game_history: List of `_position_key(board)` strings from the actual
                 game history (last entry == root's position).
+            early_exit_min_sims: If > 0, after at least this many sims have
+                completed, bail out as soon as the most-visited root child's
+                lead exceeds the remaining sim budget — i.e. as soon as no
+                possible distribution of remaining visits could change the
+                argmax-by-N move. Provably doesn't change the chosen move.
+                Pass 0 to disable.
         """
         t0 = time.time()
         self._reset_search_stats()
@@ -488,6 +546,7 @@ class MCTSEngine:
                 "simulations": 0,
                 "evaluated_positions": 0,
                 "batched_eval_calls": 0,
+                "early_exit": False,
             }
         if root.is_terminal:
             # Stale terminal flag (rep check no longer true given current history).
@@ -503,7 +562,15 @@ class MCTSEngine:
             self.evaluated_positions += 1
 
         n_done = 0
+        early_exit_triggered = False
         while n_done < n_sims:
+            # Visit-domination early exit (top of every iteration). Picks up the
+            # post-batch state from the previous iteration and any pre-existing
+            # tree-reuse imbalance.
+            if self._is_visit_dominated(root, n_sims, n_done, early_exit_min_sims):
+                early_exit_triggered = True
+                break
+
             target = min(batch_size, n_sims - n_done)
             batch_leaves: List[MCTSNode] = []
             batch_paths: List[List[MCTSNode]] = []
@@ -515,6 +582,14 @@ class MCTSEngine:
                 if leaf.is_terminal:
                     self._backprop(path, leaf.terminal_value, undo_virtual_loss=False)
                     n_done += 1
+                    # Check after each terminal-leaf sim too: forced-move positions
+                    # (one legal move that leads to a terminal) hit only this path
+                    # and would otherwise burn through every sim before exiting.
+                    if self._is_visit_dominated(
+                        root, n_sims, n_done, early_exit_min_sims
+                    ):
+                        early_exit_triggered = True
+                        break
                     continue
                 # Apply virtual loss along the path so concurrent descents diverge.
                 for n in path:
@@ -522,6 +597,8 @@ class MCTSEngine:
                 batch_leaves.append(leaf)
                 batch_paths.append(path)
 
+            if early_exit_triggered:
+                break
             if not batch_leaves:
                 # All remaining sims terminated immediately. Done.
                 break
@@ -547,6 +624,8 @@ class MCTSEngine:
                     self._expand_node(leaf, p_arr[i])
 
             # Phase 4: backprop value and undo virtual loss for each batched sim.
+            # The visit-domination early-exit check fires at the top of the next
+            # iteration of this outer loop, so it sees the post-Phase-4 state.
             for leaf, path in zip(batch_leaves, batch_paths):
                 v_white = float(v_arr[leaf_to_idx[id(leaf)]])
                 self._backprop(path, v_white, undo_virtual_loss=True)
@@ -557,6 +636,7 @@ class MCTSEngine:
             "simulations": n_done,
             "evaluated_positions": self.evaluated_positions,
             "batched_eval_calls": self.batched_eval_calls,
+            "early_exit": early_exit_triggered,
         }
 
     # --- top-level move selection ---
@@ -569,6 +649,7 @@ class MCTSEngine:
         cpuct: float,
         fpu_reduction: float,
         game_history: List[str],
+        early_exit_min_sims: int = 0,
     ) -> Tuple[chess.Move, Dict[str, Any]]:
         """Run sims and return the most-visited root move plus stats.
 
@@ -580,16 +661,21 @@ class MCTSEngine:
             fpu_reduction: First-play urgency reduction.
             game_history: List of `_position_key(board)` strings from the actual
                 game history (last entry == root's position).
+            early_exit_min_sims: See `run_simulations`. 0 disables.
 
         Returns:
             Tuple of (best_move, stats_dict)
 
         stats contains:
           elapsed, simulations, evaluated_positions, batched_eval_calls,
+          early_exit (bool: True iff the visit-domination early-exit fired),
           q_for_mover (Q from the side-to-move's perspective on selected child),
           selected_prior, top_moves: List[(move, visits, prior, Q_white)].
         """
-        sim_stats = self.run_simulations(root, n_sims, batch_size, cpuct, fpu_reduction, game_history)
+        sim_stats = self.run_simulations(
+            root, n_sims, batch_size, cpuct, fpu_reduction, game_history,
+            early_exit_min_sims=early_exit_min_sims,
+        )
 
         if not root.children:
             raise ValueError("Root has no children; no legal move available.")
@@ -639,58 +725,29 @@ def format_top_moves(
 
 
 # =============================================================================
-# Board display
+# Stockfish helpers
 # =============================================================================
 
 
-def display_board(board: chess.Board, flip: bool = False):
-    """Display the board in ASCII with coordinates."""
-    print()
-    ranks = range(7, -1, -1) if not flip else range(8)
-    for rank in ranks:
-        print(f" {rank + 1} ", end="")
-        for file in range(8):
-            square = chess.square(file, rank)
-            piece = board.piece_at(square)
-            if piece:
-                symbol = piece.symbol()
-            else:
-                symbol = "."
-            print(f" {symbol}", end="")
-        print()
-    print("    a b c d e f g h")
-    print()
+def configure_stockfish(engine: chess.engine.SimpleEngine, skill_level: int):
+    skill_level = max(0, min(20, skill_level))
+    try:
+        engine.configure({"Skill Level": skill_level})
+    except chess.engine.EngineError as exc:
+        print(f"Warning: could not configure Stockfish skill level: {exc}")
 
 
-# =============================================================================
-# Human move input
-# =============================================================================
-
-
-def get_human_move(board: chess.Board) -> Optional[chess.Move]:
-    """Prompt the human player for a move in SAN notation.
-
-    Returns None if the user wants to quit.
-    """
-    while True:
-        move_str = input("Your move (in SAN, e.g., 'e4', 'Nf3', 'O-O', or 'quit'): ").strip()
-
-        if move_str.lower() in ["quit", "q", "exit"]:
-            return None
-
-        if not move_str:
-            continue
-
-        try:
-            # Try to parse as SAN
-            move = board.parse_san(move_str)
-            if move in board.legal_moves:
-                return move
-            else:
-                print(f"Illegal move: {move_str}")
-        except ValueError:
-            print(f"Invalid move notation: {move_str}")
-            print("Please use SAN notation (e.g., e4, Nf3, Bxc6, O-O-O, etc.)")
+def stockfish_move(
+    engine: chess.engine.SimpleEngine,
+    board: chess.Board,
+    movetime: Optional[float],
+    depth: Optional[int],
+) -> chess.Move:
+    if depth is not None:
+        limit = chess.engine.Limit(depth=depth)
+    else:
+        limit = chess.engine.Limit(time=movetime)
+    return engine.play(board, limit).move
 
 
 # =============================================================================
@@ -699,56 +756,52 @@ def get_human_move(board: chess.Board) -> Optional[chess.Move]:
 
 
 def play_one_game(
+    game_idx: int,
     neural: MCTSEngine,
-    engine_color: chess.Color,
+    stockfish: chess.engine.SimpleEngine,
+    neural_color: chess.Color,
     n_simulations: int,
     mcts_batch_size: int,
     cpuct: float,
     fpu_reduction: float,
     reuse_tree: bool,
+    stockfish_time: float,
+    stockfish_depth: Optional[int],
+    stockfish_level: int,
     max_plies: int,
-    show_engine_analysis: bool,
-) -> chess.pgn.Game:
+    verbose: bool,
+    progress_callback: Optional[Callable[[int, str, bool], None]] = None,
+    early_exit_min_sims: int = 0,
+) -> Tuple[chess.pgn.Game, float, float]:
     board = chess.Board()
     game = chess.pgn.Game()
-    game.headers["Event"] = "Human vs NeuralEngine(MCTS)"
+    sf_name = f"Stockfish-L{stockfish_level}"
+    game.headers["Event"] = f"NeuralEngine(MCTS) vs {sf_name}"
     game.headers["Date"] = datetime.utcnow().strftime("%Y.%m.%d")
-    game.headers["White"] = "NeuralEngine" if engine_color == chess.WHITE else "Human"
-    game.headers["Black"] = "Human" if engine_color == chess.WHITE else "NeuralEngine"
+    game.headers["Round"] = str(game_idx + 1)
+    game.headers["White"] = "NeuralEngine" if neural_color == chess.WHITE else sf_name
+    game.headers["Black"] = sf_name if neural_color == chess.WHITE else "NeuralEngine"
 
     mcts_root: Optional[MCTSNode] = neural.make_root(board) if reuse_tree else None
 
     # Track position history for repetition detection.
     # Use `_position_key` (FEN minus halfmove/fullmove counters): captures pieces,
     # side-to-move, castling rights, and en-passant target — exactly the FIDE-rule
-    # equality criterion.
+    # equality criterion. `board_fen()` would be wrong: it includes only piece
+    # placement, so e.g. a post-castling king/rook return to e1/h1 would be
+    # falsely considered equal to the starting position despite different
+    # castling rights.
     position_history: List[str] = [_position_key(board)]
 
     pgn_node = game
     ply = 0
-
-    print("\n" + "="*60)
-    print("GAME START")
-    print("="*60)
-    print(f"Engine plays: {'WHITE' if engine_color == chess.WHITE else 'BLACK'}")
-    print(f"Human plays:  {'WHITE' if engine_color == chess.BLACK else 'BLACK'}")
-    print("="*60)
+    nn_time_total = 0.0
+    sf_time_total = 0.0
 
     while not board.is_game_over(claim_draw=True) and ply < max_plies:
-        # Display board from human's perspective (flipped if human is black)
-        flip_display = (engine_color == chess.WHITE)
-        display_board(board, flip=flip_display)
-
-        move_number = board.fullmove_number
-        side_name = "White" if board.turn == chess.WHITE else "Black"
-        print(f"Move {move_number}, {side_name} to move")
-
-        if board.turn == engine_color:
-            # Engine's turn
-            print("\nEngine is thinking...")
+        if board.turn == neural_color:
             if not reuse_tree or mcts_root is None:
                 mcts_root = neural.make_root(board)
-
             move, search_stats = neural.choose_move(
                 mcts_root,
                 n_sims=n_simulations,
@@ -756,41 +809,37 @@ def play_one_game(
                 cpuct=cpuct,
                 fpu_reduction=fpu_reduction,
                 game_history=position_history,
+                early_exit_min_sims=early_exit_min_sims,
             )
-
-            san = board.san(move)
-            print(f"\nEngine plays: {san}")
-            print(f"  Evaluation: Q={search_stats['q_for_mover']:+.2f}")
-            print(f"  Search time: {search_stats['elapsed']:.2f}s")
-            print(f"  Simulations: {search_stats['simulations']}")
-
-            if show_engine_analysis:
-                print(f"  Top moves: {format_top_moves(board, search_stats['top_moves'], 5)}")
-
+            nn_time_total += search_stats["elapsed"]
+            ee_tag = "*" if search_stats.get("early_exit") else ""
             comment = (
                 f"Q {search_stats['q_for_mover']:+.2f} "
                 f"P {search_stats['selected_prior']:.3f} "
-                f"N {search_stats['root_visits']}"
+                f"N {search_stats['root_visits']}{ee_tag}"
             )
+            if verbose:
+                print(f"  Top: {format_top_moves(board, search_stats['top_moves'], 5)}")
+                print(
+                    f"  search: sims={search_stats['simulations']}"
+                    f"{' (early exit)' if search_stats.get('early_exit') else ''}, "
+                    f"evaluated={search_stats['evaluated_positions']}, "
+                    f"batches={search_stats['batched_eval_calls']}, "
+                    f"time={search_stats['elapsed']:.2f}s"
+                )
         else:
-            # Human's turn
-            print("\nLegal moves:")
-            legal_sans = [board.san(m) for m in board.legal_moves]
-            for i, san_move in enumerate(sorted(legal_sans)):
-                print(f"  {san_move}", end="")
-                if (i + 1) % 8 == 0:
-                    print()
-            print("\n")
-
-            move = get_human_move(board)
-            if move is None:
-                print("\nGame abandoned by human.")
-                game.headers["Result"] = "*"
-                return game
-
-            san = board.san(move)
-            print(f"\nYou play: {san}")
+            sf_t0 = time.time()
+            move = stockfish_move(stockfish, board, stockfish_time, stockfish_depth)
+            sf_time_total += time.time() - sf_t0
             comment = ""
+
+        san = board.san(move)
+        move_prefix = (
+            f"{board.fullmove_number}. " if board.turn == chess.WHITE
+            else f"{board.fullmove_number}..."
+        )
+        if verbose:
+            print(f"{move_prefix}{san}")
 
         board.push(move)
 
@@ -804,29 +853,144 @@ def play_one_game(
             pgn_node.comment = comment
         ply += 1
 
-    # Game over
-    display_board(board, flip=flip_display)
-    result = board.result(claim_draw=True)
-    game.headers["Result"] = result
+        if progress_callback is not None:
+            # board.turn just flipped after push; white-just-moved iff black is now to move.
+            progress_callback(ply, san, board.turn == chess.BLACK)
 
-    print("\n" + "="*60)
-    print("GAME OVER")
-    print("="*60)
-    print(f"Result: {result}")
+    game.headers["Result"] = board.result(claim_draw=True)
+    return game, nn_time_total, sf_time_total
 
-    if board.is_checkmate():
-        winner = "White" if board.turn == chess.BLACK else "Black"
-        print(f"Checkmate! {winner} wins!")
-    elif board.is_stalemate():
-        print("Stalemate!")
-    elif board.is_insufficient_material():
-        print("Draw by insufficient material")
-    elif board.can_claim_draw():
-        print("Draw (by repetition or 50-move rule)")
 
-    print("="*60)
+# =============================================================================
+# Multiprocessing worker
+# =============================================================================
 
-    return game
+
+_WORKER_NEURAL: Optional[MCTSEngine] = None
+_WORKER_STOCKFISH: Optional[chess.engine.SimpleEngine] = None
+_WORKER_LAST_LEVEL: Optional[int] = None
+_WORKER_PROGRESS: Optional[Any] = None
+
+
+def _init_worker(
+    model_path: str,
+    device: str,
+    eval_batch_size: int,
+    stockfish_path: str,
+    progress_dict: Optional[Any],
+):
+    global _WORKER_NEURAL, _WORKER_STOCKFISH, _WORKER_LAST_LEVEL, _WORKER_PROGRESS
+    _WORKER_NEURAL = MCTSEngine(
+        model_path,
+        device=device,
+        eval_batch_size=eval_batch_size,
+    )
+    _WORKER_STOCKFISH = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+    try:
+        _WORKER_STOCKFISH.configure({"Threads": 1})
+    except chess.engine.EngineError:
+        pass
+    _WORKER_LAST_LEVEL = None
+    _WORKER_PROGRESS = progress_dict
+
+
+def _run_one_game_in_worker(task: Tuple[int, int, bool, Dict[str, Any]]):
+    global _WORKER_NEURAL, _WORKER_STOCKFISH, _WORKER_LAST_LEVEL, _WORKER_PROGRESS
+    level, game_idx, neural_color, play_params = task
+
+    if level != _WORKER_LAST_LEVEL:
+        configure_stockfish(_WORKER_STOCKFISH, level)
+        _WORKER_LAST_LEVEL = level
+
+    pid = os.getpid()
+    progress_cb: Optional[Callable[[int, str, bool], None]] = None
+    if _WORKER_PROGRESS is not None:
+        _WORKER_PROGRESS[pid] = (level, game_idx, neural_color, 0, "", False, time.time())
+
+        def progress_cb(ply: int, san: str, white_just_moved: bool):
+            _WORKER_PROGRESS[pid] = (
+                level, game_idx, neural_color, ply, san, white_just_moved, time.time()
+            )
+
+    start = time.time()
+    try:
+        game, nn_time, sf_time = play_one_game(
+            game_idx=game_idx,
+            neural=_WORKER_NEURAL,
+            stockfish=_WORKER_STOCKFISH,
+            neural_color=neural_color,
+            stockfish_level=level,
+            verbose=False,
+            progress_callback=progress_cb,
+            **play_params,
+        )
+    finally:
+        if _WORKER_PROGRESS is not None:
+            _WORKER_PROGRESS.pop(pid, None)
+    elapsed = time.time() - start
+    return (
+        level,
+        game_idx,
+        neural_color,
+        str(game),
+        game.headers["Result"],
+        elapsed,
+        nn_time,
+        sf_time,
+    )
+
+
+# =============================================================================
+# Progress printer (parallel mode)
+# =============================================================================
+
+
+def _format_progress_line(state: tuple) -> str:
+    level, game_idx, neural_color, ply, san, white_moved, ts = state
+    elapsed = time.time() - ts
+    full_move = (ply + 1) // 2
+    if ply == 0:
+        move_str = "(starting)"
+    elif white_moved:
+        move_str = f"{full_move}.{san}"
+    else:
+        move_str = f"{full_move}...{san}"
+    side_to_move_now = chess.BLACK if white_moved and ply > 0 else chess.WHITE
+    if ply == 0:
+        thinking = "neural" if neural_color == chess.WHITE else "stockfish"
+    else:
+        thinking = "neural" if side_to_move_now == neural_color else "stockfish"
+    n_color = "W" if neural_color == chess.WHITE else "B"
+    return (
+        f"  L{level:>2} g{game_idx + 1} (n={n_color}) ply {ply} {move_str:<10} "
+        f"— {thinking} thinking {elapsed:.1f}s"
+    )
+
+
+def _progress_printer_loop(
+    progress_dict: Any,
+    stop_event: threading.Event,
+    interval: float,
+    total_tasks: int,
+    games_done_ref: List[int],
+    print_lock: threading.Lock,
+):
+    while not stop_event.wait(interval):
+        try:
+            snapshot = list(progress_dict.items())
+        except Exception:
+            continue
+        if not snapshot:
+            continue
+        snapshot.sort(key=lambda kv: (kv[1][0], kv[1][1]))
+        with print_lock:
+            done = games_done_ref[0]
+            print(
+                f"\n--- progress ({len(snapshot)} active, "
+                f"{done}/{total_tasks} done) ---"
+            )
+            for _pid, state in snapshot:
+                print(_format_progress_line(state))
 
 
 # =============================================================================
@@ -834,12 +998,27 @@ def play_one_game(
 # =============================================================================
 
 
+def _classify_result(result: str, neural_color: chess.Color) -> str:
+    if result == "1/2-1/2":
+        return "draw"
+    if (result == "1-0" and neural_color == chess.WHITE) or \
+       (result == "0-1" and neural_color == chess.BLACK):
+        return "win"
+    return "loss"
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Play interactively against the trained neural engine using MCTS."
+        description="Play Stockfish vs the trained neural engine using MCTS."
     )
     parser.add_argument("--model", default=None,
                         help="Path to model checkpoint. Defaults to latest attempt_*_epoch*.pt.")
+    parser.add_argument("--stockfish", default="/usr/games/stockfish")
+    parser.add_argument("--stockfish-level-min", type=int, default=5)
+    parser.add_argument("--stockfish-level-max", type=int, default=None,
+                        help="Defaults to --stockfish-level-min.")
+    parser.add_argument("--stockfish-time", type=float, default=0.1)
+    parser.add_argument("--stockfish-depth", type=int, default=None)
 
     # MCTS-specific
     parser.add_argument("--mcts-simulations", type=int, default=800,
@@ -852,48 +1031,221 @@ def main():
                         help="First-play urgency reduction (subtracted from parent Q for unvisited children).")
     parser.add_argument("--mcts-no-reuse-tree", action="store_true",
                         help="Disable subtree reuse across moves in a game.")
+    parser.add_argument("--mcts-early-exit-min-sims", type=int, default=200,
+                        help="Visit-domination early exit: bail once the most-visited "
+                             "root child's lead exceeds the remaining sim budget. The "
+                             "value is the minimum sims that must complete before the "
+                             "check is allowed to fire (prevents bailing on noise). "
+                             "0 disables. Default 200.")
 
-    parser.add_argument("--engine-color", choices=["white", "black"], default="black",
-                        help="Which color the engine plays (human plays the opposite).")
+    parser.add_argument("--engine-color", choices=["white", "black", "both", "random"], default="both")
+    parser.add_argument("--games", type=int, default=2, help="Games per Stockfish level.")
     parser.add_argument("--max-plies", type=int, default=240)
     parser.add_argument("--eval-batch-size", type=int, default=4096,
                         help="Hard cap on inner forward-pass chunk size (rarely needs raising).")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"])
-    parser.add_argument("--pgn-out", default="human_vs_neural_mcts.pgn")
+    parser.add_argument("--pgn-out", default="neural_vs_stockfish_mcts.pgn")
     parser.add_argument("--append", action="store_true")
-    parser.add_argument("--no-engine-analysis", action="store_true",
-                        help="Hide engine's top move analysis.")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--parallel-games", type=int, default=1,
+                        help="Run this many games concurrently in worker processes.")
+    parser.add_argument("--progress-interval", type=float, default=10.0,
+                        help="Snapshot interval in parallel mode (s). 0 disables.")
     args = parser.parse_args()
 
     print(
         "MCTS settings: "
         f"sims={args.mcts_simulations}, batch={args.mcts_batch_size}, "
         f"cpuct={args.mcts_cpuct}, fpu={args.mcts_fpu}, "
-        f"reuse_tree={not args.mcts_no_reuse_tree}"
+        f"reuse_tree={not args.mcts_no_reuse_tree}, "
+        f"early_exit_min_sims={args.mcts_early_exit_min_sims}"
     )
+
+    level_min = args.stockfish_level_min
+    level_max = args.stockfish_level_max if args.stockfish_level_max is not None else level_min
+    if level_max < level_min:
+        parser.error("--stockfish-level-max must be >= --stockfish-level-min")
+    levels = list(range(level_min, level_max + 1))
 
     model_path = args.model or find_latest_model()
-    engine_color = chess.WHITE if args.engine_color == "white" else chess.BLACK
+    mode = "a" if args.append else "w"
 
+    play_params: Dict[str, Any] = {
+        "n_simulations": args.mcts_simulations,
+        "mcts_batch_size": args.mcts_batch_size,
+        "cpuct": args.mcts_cpuct,
+        "fpu_reduction": args.mcts_fpu,
+        "reuse_tree": not args.mcts_no_reuse_tree,
+        "stockfish_time": args.stockfish_time,
+        "stockfish_depth": args.stockfish_depth,
+        "max_plies": args.max_plies,
+        "early_exit_min_sims": args.mcts_early_exit_min_sims,
+    }
+
+    parallel = max(1, args.parallel_games)
+    if parallel == 1:
+        _run_sequential(args, levels, model_path, mode, play_params)
+    else:
+        _run_parallel(args, levels, model_path, mode, play_params, parallel)
+
+
+def _run_sequential(args, levels, model_path, mode, play_params):
     neural = MCTSEngine(model_path, device=args.device, eval_batch_size=args.eval_batch_size)
+    print(f"Starting Stockfish: {args.stockfish}")
+    stockfish = chess.engine.SimpleEngine.popen_uci(args.stockfish)
 
-    game = play_one_game(
-        neural=neural,
-        engine_color=engine_color,
-        n_simulations=args.mcts_simulations,
-        mcts_batch_size=args.mcts_batch_size,
-        cpuct=args.mcts_cpuct,
-        fpu_reduction=args.mcts_fpu,
-        reuse_tree=not args.mcts_no_reuse_tree,
-        max_plies=args.max_plies,
-        show_engine_analysis=not args.no_engine_analysis,
+    summary: List[Tuple[int, int, int, int, float, float]] = []
+    try:
+        with open(args.pgn_out, mode, encoding="utf-8") as pgn_file:
+            for level in levels:
+                configure_stockfish(stockfish, level)
+                print(f"\n=== Stockfish Skill Level {level} ===")
+                wins = losses = draws = 0
+                level_nn = 0.0
+                level_sf = 0.0
+                for game_idx in range(args.games):
+                    neural_color = pick_engine_color(args.engine_color, game_idx)
+                    print(
+                        f"Game {game_idx + 1}/{args.games} (L{level}): neural plays "
+                        f"{'white' if neural_color == chess.WHITE else 'black'}"
+                    )
+                    game, nn_time, sf_time = play_one_game(
+                        game_idx=game_idx,
+                        neural=neural,
+                        stockfish=stockfish,
+                        neural_color=neural_color,
+                        stockfish_level=level,
+                        verbose=not args.quiet,
+                        **play_params,
+                    )
+                    level_nn += nn_time
+                    level_sf += sf_time
+                    print(game, file=pgn_file, end="\n\n")
+                    pgn_file.flush()
+                    result = game.headers["Result"]
+                    print(f"  Result: {result}  [nn={nn_time:.1f}s sf={sf_time:.1f}s]")
+
+                    outcome = _classify_result(result, neural_color)
+                    if outcome == "win":
+                        wins += 1
+                    elif outcome == "loss":
+                        losses += 1
+                    else:
+                        draws += 1
+
+                print(
+                    f"  L{level} record: +{wins} -{losses} ={draws} (of {args.games})"
+                    f"  nn={level_nn:.1f}s sf={level_sf:.1f}s"
+                )
+                summary.append((level, wins, losses, draws, level_nn, level_sf))
+    finally:
+        stockfish.quit()
+
+    print(f"\nWrote PGN to {args.pgn_out}")
+    if len(summary) > 1:
+        print("\nSummary across levels:")
+        for level, wins, losses, draws, nn_t, sf_t in summary:
+            print(f"  L{level:>2}: +{wins} -{losses} ={draws}  nn={nn_t:.1f}s sf={sf_t:.1f}s")
+        total_nn = sum(s[4] for s in summary)
+        total_sf = sum(s[5] for s in summary)
+        print(f"  total: nn={total_nn:.1f}s sf={total_sf:.1f}s")
+
+
+def _run_parallel(args, levels, model_path, mode, play_params, parallel):
+    tasks: List[Tuple[int, int, bool, Dict[str, Any]]] = []
+    for level in levels:
+        for game_idx in range(args.games):
+            neural_color = pick_engine_color(args.engine_color, game_idx)
+            tasks.append((level, game_idx, neural_color, play_params))
+
+    n_workers = min(parallel, len(tasks))
+    print(
+        f"Parallel mode: {n_workers} worker process(es) for {len(tasks)} game(s) "
+        f"across {len(levels)} level(s). Per-move logging is suppressed."
     )
 
-    mode = "a" if args.append else "w"
-    with open(args.pgn_out, mode, encoding="utf-8") as pgn_file:
-        print(game, file=pgn_file, end="\n\n")
+    ctx = mp.get_context("spawn")
 
-    print(f"\nGame saved to {args.pgn_out}")
+    progress_dict: Optional[Any] = None
+    progress_manager = None
+    progress_thread: Optional[threading.Thread] = None
+    progress_stop = threading.Event()
+    print_lock = threading.Lock()
+    games_done_ref = [0]
+
+    if args.progress_interval > 0:
+        progress_manager = ctx.Manager()
+        progress_dict = progress_manager.dict()
+        progress_thread = threading.Thread(
+            target=_progress_printer_loop,
+            args=(
+                progress_dict, progress_stop, args.progress_interval,
+                len(tasks), games_done_ref, print_lock,
+            ),
+            daemon=True,
+        )
+        progress_thread.start()
+        print(f"Progress snapshots every {args.progress_interval:g}s.")
+
+    summary_per_level: Dict[int, List[float]] = {level: [0, 0, 0, 0.0, 0.0] for level in levels}
+    overall_start = time.time()
+
+    try:
+        with open(args.pgn_out, mode, encoding="utf-8") as pgn_file:
+            with ctx.Pool(
+                processes=n_workers,
+                initializer=_init_worker,
+                initargs=(
+                    model_path, args.device, args.eval_batch_size,
+                    args.stockfish, progress_dict,
+                ),
+            ) as pool:
+                for level, game_idx, neural_color, pgn_str, result, game_secs, nn_time, sf_time in \
+                        pool.imap_unordered(_run_one_game_in_worker, tasks):
+                    pgn_file.write(pgn_str)
+                    pgn_file.write("\n\n")
+                    pgn_file.flush()
+
+                    outcome = _classify_result(result, neural_color)
+                    if outcome == "win":
+                        summary_per_level[level][0] += 1
+                    elif outcome == "loss":
+                        summary_per_level[level][1] += 1
+                    else:
+                        summary_per_level[level][2] += 1
+                    summary_per_level[level][3] += nn_time
+                    summary_per_level[level][4] += sf_time
+
+                    games_done_ref[0] += 1
+                    color = "white" if neural_color == chess.WHITE else "black"
+                    with print_lock:
+                        print(
+                            f"[{games_done_ref[0]}/{len(tasks)}] L{level} game {game_idx + 1} "
+                            f"(neural {color}): {result} in {game_secs:.1f}s "
+                            f"[nn={nn_time:.1f}s sf={sf_time:.1f}s]"
+                        )
+    finally:
+        progress_stop.set()
+        if progress_thread is not None:
+            progress_thread.join(timeout=2)
+        if progress_manager is not None:
+            progress_manager.shutdown()
+
+    overall_elapsed = time.time() - overall_start
+    total_nn = sum(s[3] for s in summary_per_level.values())
+    total_sf = sum(s[4] for s in summary_per_level.values())
+    print(f"\nWrote PGN to {args.pgn_out}")
+    print(f"Wall time for {len(tasks)} games: {overall_elapsed:.1f}s "
+          f"({overall_elapsed / len(tasks):.1f}s/game avg)")
+    print(f"Aggregate engine time across workers: nn={total_nn:.1f}s sf={total_sf:.1f}s")
+
+    print("\nResults per level:")
+    for level in levels:
+        w, l, d, nn_t, sf_t = summary_per_level[level]
+        print(
+            f"  L{level:>2}: +{int(w)} -{int(l)} ={int(d)}  (of {args.games})"
+            f"  nn={nn_t:.1f}s sf={sf_t:.1f}s"
+        )
 
 
 if __name__ == "__main__":
