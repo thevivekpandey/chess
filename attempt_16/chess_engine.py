@@ -118,6 +118,95 @@ def fen_to_tensor(fen: str) -> torch.Tensor:
     return torch.from_numpy(planes)
 
 
+# Order: white PAWN..KING (planes 0-5), then black PAWN..KING (planes 6-11),
+# matching the layout written by fen_to_tensor / PIECE_TO_PLANE.
+_PIECE_PLANE_ORDER = (
+    (chess.WHITE, chess.PAWN),
+    (chess.WHITE, chess.KNIGHT),
+    (chess.WHITE, chess.BISHOP),
+    (chess.WHITE, chess.ROOK),
+    (chess.WHITE, chess.QUEEN),
+    (chess.WHITE, chess.KING),
+    (chess.BLACK, chess.PAWN),
+    (chess.BLACK, chess.KNIGHT),
+    (chess.BLACK, chess.BISHOP),
+    (chess.BLACK, chess.ROOK),
+    (chess.BLACK, chess.QUEEN),
+    (chess.BLACK, chess.KING),
+)
+
+
+def boards_to_tensors(boards: List[chess.Board], buffer: torch.Tensor):
+    """
+    Highly optimized batch encoding. Uses bulk bitboard unpacking to 
+    minimize Python overhead.
+    """
+    n = len(boards)
+    buf_np = buffer.numpy()
+    
+    # 1. Bulk encode all piece planes (0-11)
+    # Pack 12 bitboards per board into a single array
+    bbs = np.zeros((n, 12), dtype=np.uint64)
+    for i, b in enumerate(boards):
+        occ = b.occupied_co
+        # Directly grab bitboards from python-chess internals
+        bbs[i, 0] = occ[chess.WHITE] & b.pawns
+        bbs[i, 1] = occ[chess.WHITE] & b.knights
+        bbs[i, 2] = occ[chess.WHITE] & b.bishops
+        bbs[i, 3] = occ[chess.WHITE] & b.rooks
+        bbs[i, 4] = occ[chess.WHITE] & b.queens
+        bbs[i, 5] = occ[chess.WHITE] & b.kings
+        bbs[i, 6] = occ[chess.BLACK] & b.pawns
+        bbs[i, 7] = occ[chess.BLACK] & b.knights
+        bbs[i, 8] = occ[chess.BLACK] & b.bishops
+        bbs[i, 9] = occ[chess.BLACK] & b.rooks
+        bbs[i, 10] = occ[chess.BLACK] & b.queens
+        bbs[i, 11] = occ[chess.BLACK] & b.kings
+
+    # Unpack bits for all boards and planes in one call
+    # (N, 12) uint64 -> (N, 12, 64) uint8 -> (N, 12, 8, 8)
+    bits = np.unpackbits(bbs.view(np.uint8), bitorder='little').reshape(n, 12, 8, 8)
+    # Copy into buffer and flip rank (chess rank 1 is bit 0)
+    buf_np[:n, 0:12] = bits[:, :, ::-1, :]
+    
+    # 2. Remaining planes (Castling, Turn, EP)
+    # These are filled in the loop because they are single-value or sparse
+    buf_np[:n, 12:18] = 0.0
+    for i, b in enumerate(boards):
+        if b.has_kingside_castling_rights(chess.WHITE): buf_np[i, 12] = 1.0
+        if b.has_queenside_castling_rights(chess.WHITE): buf_np[i, 13] = 1.0
+        if b.has_kingside_castling_rights(chess.BLACK): buf_np[i, 14] = 1.0
+        if b.has_queenside_castling_rights(chess.BLACK): buf_np[i, 15] = 1.0
+        if b.turn == chess.WHITE: buf_np[i, 16] = 1.0
+        if b.ep_square is not None and b.has_pseudo_legal_en_passant():
+            buf_np[i, 17, 7 - (b.ep_square // 8), b.ep_square % 8] = 1.0
+
+def board_to_tensor(board: chess.Board) -> torch.Tensor:
+    """
+    Build the 18-plane tensor directly from a chess.Board.
+    Optimized version.
+    """
+    planes = np.zeros((NUM_PLANES, 8, 8), dtype=np.float32)
+    for color in [chess.WHITE, chess.BLACK]:
+        color_offset = 0 if color == chess.WHITE else 6
+        for piece_type in range(1, 7):
+            bb = board.pieces_mask(piece_type, color)
+            if bb == 0: continue
+            plane_idx = color_offset + piece_type - 1
+            bits = np.frombuffer(np.uint64(bb).tobytes(), dtype=np.uint8)
+            unpacked = np.unpackbits(bits, bitorder='little').reshape(8, 8)
+            planes[plane_idx] = np.flipud(unpacked)
+
+    if board.has_kingside_castling_rights(chess.WHITE): planes[12] = 1.0
+    if board.has_queenside_castling_rights(chess.WHITE): planes[13] = 1.0
+    if board.has_kingside_castling_rights(chess.BLACK): planes[14] = 1.0
+    if board.has_queenside_castling_rights(chess.BLACK): planes[15] = 1.0
+    if board.turn == chess.WHITE: planes[16] = 1.0
+    if board.ep_square is not None and board.has_pseudo_legal_en_passant():
+        planes[17, 7 - (board.ep_square // 8), board.ep_square % 8] = 1.0
+    return torch.from_numpy(planes)
+
+
 def normalize_eval(eval_pawns: float, max_pawns: float = 10.0) -> float:
     """
     Normalize pawn evaluation to [-1, 1] range using tanh-like scaling.
@@ -307,6 +396,53 @@ def move_to_policy_index(move_str: str) -> Optional[Tuple[int, int, int]]:
     plane = dir_idx * 7 + (distance - 1)  # distance 1 -> offset 0, etc.
 
     return (src_row, src_col, plane)
+
+
+# =============================================================================
+# Fast move-encoding lookup table
+# =============================================================================
+# `move_to_policy_index` is pure: its output depends only on the (from_square,
+# to_square, promotion) triple of a chess.Move. There are at most 64*64*5
+# encodable triples (promotion ∈ {None, KNIGHT, BISHOP, ROOK, QUEEN}), so we
+# precompute the full table at import time and reduce per-move lookup to a
+# single numpy index.
+#
+# Promotion axis encoding: 0 = no promotion; otherwise python-chess piece type
+# integer (KNIGHT=2, BISHOP=3, ROOK=4, QUEEN=5). Indices 1 (PAWN) and 6 (KING)
+# stay -1 (invalid promotions).
+#
+# Stored value is the FLAT policy index: plane * 64 + src_row * 8 + src_col.
+# -1 marks unencodable moves (the same condition that makes
+# `move_to_policy_index` return None: knight-style geometry not in the table,
+# distance > 7, etc.).
+
+_PROMO_CHAR_BY_PIECE_TYPE = {
+    chess.KNIGHT: 'n',
+    chess.BISHOP: 'b',
+    chess.ROOK:   'r',
+    chess.QUEEN:  'q',
+}
+
+
+def _build_move_flat_index_table() -> np.ndarray:
+    table = np.full((64, 64, 7), -1, dtype=np.int32)
+    for from_sq in range(64):
+        from_uci = chess.square_name(from_sq)
+        for to_sq in range(64):
+            if from_sq == to_sq:
+                continue
+            to_uci = chess.square_name(to_sq)
+            for promo_int, promo_char in [(0, '')] + list(_PROMO_CHAR_BY_PIECE_TYPE.items()):
+                uci = from_uci + to_uci + promo_char
+                idx = move_to_policy_index(uci)
+                if idx is None:
+                    continue
+                src_row, src_col, plane = idx
+                table[from_sq, to_sq, promo_int] = plane * 64 + src_row * 8 + src_col
+    return table
+
+
+MOVE_FLAT_INDEX_TABLE: np.ndarray = _build_move_flat_index_table()
 
 
 def policy_index_to_move(src_row: int, src_col: int, plane: int) -> Optional[str]:
@@ -623,10 +759,19 @@ class ChessNet(nn.Module):
         self.fc1 = nn.Linear(32 * 8 * 8, 256)
         self.fc2 = nn.Linear(256, 1)
 
-        # Policy head - outputs 73 planes (one per move type)
+        # Policy head - outputs (batch, 73, 8, 8)
         self.policy_conv1 = nn.Conv2d(res_channels, policy_channels, kernel_size=3, padding=1, bias=False)
         self.policy_bn1 = nn.BatchNorm2d(policy_channels)
         self.policy_conv2 = nn.Conv2d(policy_channels, NUM_POLICY_PLANES, kernel_size=1)
+
+        # Optimization for modern GPUs (H100)
+        if hasattr(torch, 'compile'):
+            try:
+                self.compiled_forward = torch.compile(self.forward, mode='reduce-overhead')
+            except Exception:
+                self.compiled_forward = None
+        else:
+            self.compiled_forward = None
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """

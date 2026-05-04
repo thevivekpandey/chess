@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Tuple
 import chess
 import chess.pgn
 import numpy as np
+import torch
 
 # Import MCTS engine from play_games_mcts
 from play_games_mcts import (
@@ -259,21 +260,99 @@ def save_training_examples_to_csv(
         csvfile.flush()
 
 
+# =============================================================================
+# Multiprocessing workers for parallel self-play
+# =============================================================================
+#
+# Each worker process loads its own MCTSEngine (its own model copy on the
+# target device). Games are independent, so we just `imap_unordered` over them
+# and write CSV from the main process to keep the file write serialized.
+
+_WORKER_NEURAL: Optional[MCTSEngine] = None
+_WORKER_PLAY_PARAMS: Optional[Dict] = None
+
+
+def _format_moves_san(game: chess.pgn.Game) -> str:
+    """Render a finished pgn Game as '1. e4 e5 2. Nf3 Nc6 ...'."""
+    moves_san = []
+    node = game
+    while node.variations:
+        next_node = node.variation(0)
+        moves_san.append(node.board().san(next_node.move))
+        node = next_node
+    parts = []
+    for i in range(0, len(moves_san), 2):
+        move_num = (i // 2) + 1
+        if i + 1 < len(moves_san):
+            parts.append(f"{move_num}. {moves_san[i]} {moves_san[i+1]}")
+        else:
+            parts.append(f"{move_num}. {moves_san[i]}")
+    return " ".join(parts)
+
+
+def _init_selfplay_worker(
+    model_path: str,
+    device: str,
+    eval_batch_size: int,
+    play_params: Dict,
+    base_seed: int,
+):
+    """Per-worker initialization for parallel self-play."""
+    global _WORKER_NEURAL, _WORKER_PLAY_PARAMS
+
+    # Cap torch intra-op threads so N workers don't all grab all 24 cores.
+    torch.set_num_threads(1)
+
+    # Decorrelate temperature sampling across workers — without this, every
+    # worker would draw the same opening line from the same RNG state.
+    pid = os.getpid()
+    seed = (base_seed * 2654435761 + pid) & 0xFFFFFFFF
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    _WORKER_NEURAL = MCTSEngine(
+        model_path,
+        device=device,
+        eval_batch_size=eval_batch_size,
+    )
+    _WORKER_PLAY_PARAMS = play_params
+
+
+def _run_one_selfplay_game_in_worker(game_idx: int):
+    """Play one self-play game; return data the main process needs for CSV/log."""
+    global _WORKER_NEURAL, _WORKER_PLAY_PARAMS
+
+    start = time.time()
+    game, training_examples = play_selfplay_game(
+        neural=_WORKER_NEURAL,
+        **_WORKER_PLAY_PARAMS,
+    )
+    elapsed = time.time() - start
+
+    result = game.headers["Result"]
+    training_examples = assign_game_outcome_to_examples(training_examples, result)
+    moves_str = _format_moves_san(game)
+
+    return game_idx, result, training_examples, elapsed, moves_str
+
+
 def generate_selfplay_games(
     model_path: str,
     num_games: int,
     output_csv: str,
     n_simulations: int = 800,
-    mcts_batch_size: int = 16,
+    mcts_batch_size: int = 64,
     cpuct: float = 2.0,
     fpu_reduction: float = 0.0,
     reuse_tree: bool = True,
     max_plies: int = 300,
     temperature_moves: int = 30,
     device: str = "cpu",
-    eval_batch_size: int = 16,
+    eval_batch_size: int = 256,
     verbose: bool = False,
     early_exit_min_sims: int = 0,
+    parallel_games: int = 1,
 ):
     """
     Generate self-play games and save training data to CSV.
@@ -289,85 +368,106 @@ def generate_selfplay_games(
         reuse_tree: Whether to reuse MCTS tree across moves
         max_plies: Maximum plies per game
         device: "cpu" or "cuda"
-        eval_batch_size: Batch size for NN evaluation
-        verbose: Print move-by-move output
+        eval_batch_size: Inner forward-pass chunk size (>= mcts_batch_size for
+            no chunking).
+        verbose: Print move-by-move output (sequential mode only — interleaved
+            output from parallel workers would be unreadable).
         early_exit_min_sims: Early exit threshold
+        parallel_games: Number of worker processes for concurrent self-play.
+            1 = run in the main process (no fork overhead).
     """
-    print(f"Initializing neural engine from {model_path}...")
-    neural = MCTSEngine(
-        model_path,
-        device=device,
-        eval_batch_size=eval_batch_size,
-    )
+    n_workers = max(1, min(parallel_games, num_games))
 
     print(f"Generating {num_games} self-play games...")
     print(f"MCTS config: simulations={n_simulations}, batch={mcts_batch_size}, cpuct={cpuct}")
+    print(f"Parallel workers: {n_workers}")
     print(f"Output: {output_csv}")
     print()
 
     total_positions = 0
     start_time = time.time()
 
-    for game_idx in range(num_games):
-        game_start = time.time()
+    play_params = dict(
+        n_simulations=n_simulations,
+        mcts_batch_size=mcts_batch_size,
+        cpuct=cpuct,
+        fpu_reduction=fpu_reduction,
+        reuse_tree=reuse_tree,
+        max_plies=max_plies,
+        temperature_moves=temperature_moves,
+        early_exit_min_sims=early_exit_min_sims,
+    )
 
-        if verbose:
-            print(f"\n=== Game {game_idx + 1}/{num_games} ===")
-
-        # Play one self-play game
-        game, training_examples = play_selfplay_game(
-            neural=neural,
-            n_simulations=n_simulations,
-            mcts_batch_size=mcts_batch_size,
-            cpuct=cpuct,
-            fpu_reduction=fpu_reduction,
-            reuse_tree=reuse_tree,
-            max_plies=max_plies,
-            temperature_moves=temperature_moves,
-            verbose=verbose,
-            early_exit_min_sims=early_exit_min_sims,
+    if n_workers == 1:
+        # Sequential path: avoid pool/spawn overhead.
+        print(f"Initializing neural engine from {model_path}...")
+        neural = MCTSEngine(
+            model_path, device=device, eval_batch_size=eval_batch_size,
         )
 
-        # Get game result and assign outcomes
-        result = game.headers["Result"]
-        training_examples = assign_game_outcome_to_examples(training_examples, result)
+        for game_idx in range(num_games):
+            game_start = time.time()
 
-        # Save to CSV
-        game_id = f"game_{game_idx:05d}"
-        save_training_examples_to_csv(training_examples, output_csv, game_id)
+            if verbose:
+                print(f"\n=== Game {game_idx + 1}/{num_games} ===")
 
-        game_elapsed = time.time() - game_start
-        total_positions += len(training_examples)
+            game, training_examples = play_selfplay_game(
+                neural=neural,
+                verbose=verbose,
+                **play_params,
+            )
 
-        # Extract moves in SAN notation
-        moves_san = []
-        node = game
-        while node.variations:
-            next_node = node.variation(0)
-            moves_san.append(node.board().san(next_node.move))
-            node = next_node
+            result = game.headers["Result"]
+            training_examples = assign_game_outcome_to_examples(training_examples, result)
 
-        # Format moves with move numbers (1. e4 e5 2. Nf3 Nc6 ...)
-        moves_formatted = []
-        for i in range(0, len(moves_san), 2):
-            move_num = (i // 2) + 1
-            if i + 1 < len(moves_san):
-                # Both white and black moves
-                moves_formatted.append(f"{move_num}. {moves_san[i]} {moves_san[i+1]}")
-            else:
-                # Only white's move (game ended after white's move)
-                moves_formatted.append(f"{move_num}. {moves_san[i]}")
+            game_id = f"game_{game_idx:05d}"
+            save_training_examples_to_csv(training_examples, output_csv, game_id)
 
-        # Print game summary with moves
-        print(f"Game {game_idx + 1}/{num_games}: {result}, "
-              f"{len(training_examples)} positions, {game_elapsed:.1f}s")
-        print(f"  Moves: {' '.join(moves_formatted)}")
+            game_elapsed = time.time() - game_start
+            total_positions += len(training_examples)
+
+            n_moves = len(training_examples)
+            mps = n_moves / game_elapsed if game_elapsed > 0 else 0.0
+            print(f"Game {game_idx + 1}/{num_games}: {result}, "
+                  f"{n_moves} positions, {game_elapsed:.1f}s, {mps:.1f} moves/s")
+            print(f"  Moves: {_format_moves_san(game)}")
+    else:
+        # Parallel path: workers each load their own MCTSEngine, play games
+        # concurrently, return examples; main process serializes CSV writes.
+        # spawn (not fork) is required for CUDA.
+        play_params["verbose"] = False  # workers must not print per-move
+        ctx = mp.get_context("spawn")
+        base_seed = int(time.time_ns() & 0xFFFFFFFF)
+
+        completed = 0
+        with ctx.Pool(
+            processes=n_workers,
+            initializer=_init_selfplay_worker,
+            initargs=(model_path, device, eval_batch_size, play_params, base_seed),
+        ) as pool:
+            for game_idx, result, training_examples, game_elapsed, moves_str in \
+                    pool.imap_unordered(
+                        _run_one_selfplay_game_in_worker, range(num_games)
+                    ):
+                game_id = f"game_{game_idx:05d}"
+                save_training_examples_to_csv(training_examples, output_csv, game_id)
+
+                completed += 1
+                total_positions += len(training_examples)
+
+                n_moves = len(training_examples)
+                mps = n_moves / game_elapsed if game_elapsed > 0 else 0.0
+                print(f"[{completed}/{num_games}] Game {game_idx + 1}: {result}, "
+                      f"{n_moves} positions, {game_elapsed:.1f}s, {mps:.1f} moves/s")
+                print(f"  Moves: {moves_str}")
 
     total_elapsed = time.time() - start_time
+    overall_mps = total_positions / total_elapsed if total_elapsed > 0 else 0.0
     print(f"\nCompleted {num_games} games in {total_elapsed:.1f}s")
     print(f"Total positions: {total_positions}")
     print(f"Average: {total_positions/num_games:.0f} positions/game, "
-          f"{total_elapsed/num_games:.1f}s/game")
+          f"{total_elapsed/num_games:.1f}s/game wall, "
+          f"{overall_mps:.1f} moves/s overall")
     print(f"Training data saved to: {output_csv}")
 
 
@@ -400,8 +500,20 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=16,
-        help="MCTS batch size (default: 16)"
+        default=64,
+        help="MCTS leaf-parallel batch size (default: 64)"
+    )
+    parser.add_argument(
+        "--eval-batch-size",
+        type=int,
+        default=256,
+        help="NN forward-pass chunk size (default: 256)"
+    )
+    parser.add_argument(
+        "--parallel-games",
+        type=int,
+        default=24,
+        help="Number of worker processes for concurrent self-play (default: 24)"
     )
     parser.add_argument(
         "--cpuct",
@@ -426,6 +538,12 @@ def main():
         action="store_true",
         help="Print move-by-move output"
     )
+    parser.add_argument(
+        "--early-exit-min-sims",
+        type=int,
+        default=200,
+        help="Minimum simulations before early exit (default: 200)"
+    )
 
     args = parser.parse_args()
 
@@ -435,10 +553,13 @@ def main():
         output_csv=args.output,
         n_simulations=args.simulations,
         mcts_batch_size=args.batch_size,
+        eval_batch_size=args.eval_batch_size,
         cpuct=args.cpuct,
         temperature_moves=args.temperature_moves,
         device=args.device,
         verbose=args.verbose,
+        early_exit_min_sims=args.early_exit_min_sims,
+        parallel_games=args.parallel_games,
     )
 
 

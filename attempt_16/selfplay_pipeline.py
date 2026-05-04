@@ -42,6 +42,7 @@ def run_pipeline(
     selfplay_simulations: int = 800,
     eval_simulations: int = 400,
     win_threshold: float = 0.55,
+    parallel_games: int = 1,
     skip_first_selfplay: bool = False,
     verbose: bool = False,
 ):
@@ -132,6 +133,7 @@ def run_pipeline(
                 temperature_moves=30,  # Use temperature sampling for first 30 moves
                 device=device,
                 verbose=verbose,
+                parallel_games=parallel_games,
             )
             selfplay_elapsed = time.time() - selfplay_start
 
@@ -296,6 +298,12 @@ def main():
         help="Win rate threshold for promotion (default: 0.55)"
     )
     parser.add_argument(
+        "--parallel-games",
+        type=int,
+        default=1,
+        help="Worker processes for self-play generation (default: 1)"
+    )
+    parser.add_argument(
         "--skip-first-selfplay",
         action="store_true",
         help="Skip self-play generation on first iteration (use existing data for testing)"
@@ -328,6 +336,7 @@ def main():
         selfplay_simulations=args.selfplay_simulations,
         eval_simulations=args.eval_simulations,
         win_threshold=args.win_threshold,
+        parallel_games=args.parallel_games,
         skip_first_selfplay=args.skip_first_selfplay,
         verbose=args.verbose,
     )
