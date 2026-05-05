@@ -44,7 +44,6 @@ class ReplayBuffer:
         # Load existing data if file exists
         if os.path.exists(csv_path):
             self._load_from_csv()
-            print(f"Loaded {len(self.positions)} positions from {csv_path}")
 
     def _load_from_csv(self):
         """Load all positions from CSV file."""

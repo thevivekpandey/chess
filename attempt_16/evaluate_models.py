@@ -7,13 +7,19 @@ should replace the best model based on win rate.
 """
 
 import argparse
+import multiprocessing as mp
+import os
+import random
 import time
-from typing import Tuple
+from typing import Dict, Optional, Tuple
 
 import chess
 import chess.pgn
+import numpy as np
+import torch
 
 from play_games_mcts import MCTSEngine, MCTSNode, _position_key
+from selfplay_generator import sample_move_with_temperature
 
 
 def play_evaluation_game(
@@ -26,6 +32,8 @@ def play_evaluation_game(
     fpu_reduction: float,
     reuse_tree: bool,
     max_plies: int,
+    opening_temperature_plies: int = 10,
+    opening_temperature: float = 0.5,
     verbose: bool = False,
 ) -> str:
     """
@@ -78,6 +86,17 @@ def play_evaluation_game(
             game_history=position_history,
         )
 
+        # Re-sample first N plies from visit distribution with temperature so
+        # parallel "same colors" pairings don't all collapse to the same game.
+        if ply < opening_temperature_plies:
+            top_moves = search_stats['top_moves']
+            if len(top_moves) > 1:
+                moves_only = [mv for mv, _, _, _ in top_moves]
+                visit_counts = [v for _, v, _, _ in top_moves]
+                move = sample_move_with_temperature(
+                    moves_only, visit_counts, temperature=opening_temperature
+                )
+
         if verbose:
             san = board.san(move)
             move_prefix = (
@@ -100,6 +119,66 @@ def play_evaluation_game(
     return board.result(claim_draw=True)
 
 
+# =============================================================================
+# Multiprocessing workers for parallel evaluation
+# =============================================================================
+#
+# Each worker loads BOTH the new and best models (its own copies on the target
+# device) and plays one full game per task. spawn context is required for CUDA.
+
+_WORKER_NEW_MODEL: Optional[MCTSEngine] = None
+_WORKER_BEST_MODEL: Optional[MCTSEngine] = None
+_WORKER_PLAY_PARAMS: Optional[Dict] = None
+
+
+def _init_eval_worker(
+    new_model_path: str,
+    best_model_path: str,
+    device: str,
+    eval_batch_size: int,
+    play_params: Dict,
+    base_seed: int,
+):
+    """Per-worker initialization for parallel evaluation."""
+    global _WORKER_NEW_MODEL, _WORKER_BEST_MODEL, _WORKER_PLAY_PARAMS
+
+    # Cap torch intra-op threads so N workers don't all grab all 24 cores.
+    torch.set_num_threads(1)
+
+    # Decorrelate temperature sampling across workers.
+    pid = os.getpid()
+    seed = (base_seed * 2654435761 + pid) & 0xFFFFFFFF
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    _WORKER_NEW_MODEL = MCTSEngine(
+        new_model_path, device=device, eval_batch_size=eval_batch_size, verbose=False,
+    )
+    _WORKER_BEST_MODEL = MCTSEngine(
+        best_model_path, device=device, eval_batch_size=eval_batch_size, verbose=False,
+    )
+    _WORKER_PLAY_PARAMS = play_params
+
+
+def _run_one_eval_game_in_worker(game_idx: int):
+    """Play one evaluation game; main process tallies the result."""
+    global _WORKER_NEW_MODEL, _WORKER_BEST_MODEL, _WORKER_PLAY_PARAMS
+
+    new_model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
+
+    start = time.time()
+    result = play_evaluation_game(
+        model1=_WORKER_NEW_MODEL,
+        model2=_WORKER_BEST_MODEL,
+        model1_color=new_model_color,
+        verbose=False,
+        **_WORKER_PLAY_PARAMS,
+    )
+    elapsed = time.time() - start
+    return game_idx, result, new_model_color, elapsed
+
+
 def evaluate_models(
     new_model_path: str,
     best_model_path: str,
@@ -112,8 +191,11 @@ def evaluate_models(
     max_plies: int = 300,
     device: str = "cpu",
     eval_batch_size: int = 16,
+    opening_temperature_plies: int = 10,
+    opening_temperature: float = 0.5,
     verbose: bool = False,
     win_threshold: float = 0.55,
+    parallel_games: int = 1,
 ) -> Tuple[bool, dict]:
     """
     Evaluate new model against best model.
@@ -136,62 +218,90 @@ def evaluate_models(
     Returns:
         Tuple of (should_promote, statistics)
     """
-    print(f"Loading new model from {new_model_path}...")
-    new_model = MCTSEngine(new_model_path, device=device, eval_batch_size=eval_batch_size)
-
-    print(f"Loading best model from {best_model_path}...")
-    best_model = MCTSEngine(best_model_path, device=device, eval_batch_size=eval_batch_size)
+    n_workers = max(1, min(parallel_games, num_games))
 
     print(f"\nPlaying {num_games} evaluation games...")
     print(f"MCTS: simulations={n_simulations}, batch={mcts_batch_size}, cpuct={cpuct}")
+    print(f"Parallel workers: {n_workers}")
     print(f"Win threshold: {win_threshold * 100:.0f}%")
     print()
 
     results = {'new_wins': 0, 'best_wins': 0, 'draws': 0}
     start_time = time.time()
 
-    for game_idx in range(num_games):
-        # Alternate colors
-        new_model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
+    play_params = dict(
+        n_simulations=n_simulations,
+        mcts_batch_size=mcts_batch_size,
+        cpuct=cpuct,
+        fpu_reduction=fpu_reduction,
+        reuse_tree=reuse_tree,
+        max_plies=max_plies,
+        opening_temperature_plies=opening_temperature_plies,
+        opening_temperature=opening_temperature,
+    )
 
-        if verbose:
-            print(f"\n=== Game {game_idx + 1}/{num_games} ===")
-            print(f"New model: {'White' if new_model_color == chess.WHITE else 'Black'}")
-
-        # Play game
-        result = play_evaluation_game(
-            model1=new_model,
-            model2=best_model,
-            model1_color=new_model_color,
-            n_simulations=n_simulations,
-            mcts_batch_size=mcts_batch_size,
-            cpuct=cpuct,
-            fpu_reduction=fpu_reduction,
-            reuse_tree=reuse_tree,
-            max_plies=max_plies,
-            verbose=verbose,
-        )
-
-        # Update results
+    def _tally(game_idx: int, result: str, new_model_color: chess.Color):
         if result == "1-0":
             if new_model_color == chess.WHITE:
                 results['new_wins'] += 1
-                outcome = "New model wins"
-            else:
-                results['best_wins'] += 1
-                outcome = "Best model wins"
-        elif result == "0-1":
+                return "New model wins"
+            results['best_wins'] += 1
+            return "Best model wins"
+        if result == "0-1":
             if new_model_color == chess.BLACK:
                 results['new_wins'] += 1
-                outcome = "New model wins"
-            else:
-                results['best_wins'] += 1
-                outcome = "Best model wins"
-        else:
-            results['draws'] += 1
-            outcome = "Draw"
+                return "New model wins"
+            results['best_wins'] += 1
+            return "Best model wins"
+        results['draws'] += 1
+        return "Draw"
 
-        print(f"Game {game_idx + 1}/{num_games}: {outcome} ({result})")
+    if n_workers == 1:
+        # Sequential path: load models in main process and play games one by one.
+        print(f"Loading new model from {new_model_path}...")
+        new_model = MCTSEngine(new_model_path, device=device, eval_batch_size=eval_batch_size)
+
+        print(f"Loading best model from {best_model_path}...")
+        best_model = MCTSEngine(best_model_path, device=device, eval_batch_size=eval_batch_size)
+
+        for game_idx in range(num_games):
+            new_model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
+
+            if verbose:
+                print(f"\n=== Game {game_idx + 1}/{num_games} ===")
+                print(f"New model: {'White' if new_model_color == chess.WHITE else 'Black'}")
+
+            result = play_evaluation_game(
+                model1=new_model,
+                model2=best_model,
+                model1_color=new_model_color,
+                verbose=verbose,
+                **play_params,
+            )
+
+            outcome = _tally(game_idx, result, new_model_color)
+            print(f"Game {game_idx + 1}/{num_games}: {outcome} ({result})")
+    else:
+        # Parallel path: each worker loads both models and plays one game per
+        # task. spawn (not fork) is required for CUDA.
+        ctx = mp.get_context("spawn")
+        base_seed = int(time.time_ns() & 0xFFFFFFFF)
+
+        completed = 0
+        with ctx.Pool(
+            processes=n_workers,
+            initializer=_init_eval_worker,
+            initargs=(new_model_path, best_model_path, device, eval_batch_size,
+                      play_params, base_seed),
+        ) as pool:
+            for game_idx, result, new_model_color, game_elapsed in \
+                    pool.imap_unordered(
+                        _run_one_eval_game_in_worker, range(num_games)
+                    ):
+                outcome = _tally(game_idx, result, new_model_color)
+                completed += 1
+                print(f"[{completed}/{num_games}] Game {game_idx + 1}: {outcome} "
+                      f"({result}, {game_elapsed:.1f}s)")
 
     elapsed = time.time() - start_time
 
@@ -201,8 +311,12 @@ def evaluate_models(
     best_win_rate = results['best_wins'] / total_games
     draw_rate = results['draws'] / total_games
 
+    # Score = wins + 0.5 * draws (standard chess convention). This is what we
+    # gate promotion on, so a draw-heavy improvement still counts.
+    new_score = (results['new_wins'] + 0.5 * results['draws']) / total_games
+
     # Decide if new model should be promoted
-    should_promote = new_win_rate >= win_threshold
+    should_promote = new_score >= win_threshold
 
     # Print summary
     print("\n" + "=" * 60)
@@ -212,13 +326,14 @@ def evaluate_models(
     print(f"New model wins:  {results['new_wins']:3d} ({new_win_rate * 100:.1f}%)")
     print(f"Best model wins: {results['best_wins']:3d} ({best_win_rate * 100:.1f}%)")
     print(f"Draws:           {results['draws']:3d} ({draw_rate * 100:.1f}%)")
+    print(f"New model score: {new_score * 100:.1f}% (wins + 0.5 * draws)")
     print(f"Time: {elapsed:.1f}s ({elapsed / num_games:.1f}s/game)")
     print()
 
     if should_promote:
-        print(f"✓ NEW MODEL PROMOTED (win rate {new_win_rate * 100:.1f}% >= {win_threshold * 100:.0f}%)")
+        print(f"✓ NEW MODEL PROMOTED (score {new_score * 100:.1f}% >= {win_threshold * 100:.0f}%)")
     else:
-        print(f"✗ New model NOT promoted (win rate {new_win_rate * 100:.1f}% < {win_threshold * 100:.0f}%)")
+        print(f"✗ New model NOT promoted (score {new_score * 100:.1f}% < {win_threshold * 100:.0f}%)")
     print("=" * 60)
 
     statistics = {
@@ -229,6 +344,7 @@ def evaluate_models(
         'new_win_rate': new_win_rate,
         'best_win_rate': best_win_rate,
         'draw_rate': draw_rate,
+        'new_score': new_score,
         'elapsed_time': elapsed,
     }
 
@@ -274,6 +390,12 @@ def main():
         help="Device for neural network (default: cpu)"
     )
     parser.add_argument(
+        "--parallel-games",
+        type=int,
+        default=1,
+        help="Worker processes for concurrent evaluation games (default: 1)"
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print move-by-move output"
@@ -289,6 +411,7 @@ def main():
         device=args.device,
         verbose=args.verbose,
         win_threshold=args.win_threshold,
+        parallel_games=args.parallel_games,
     )
 
     # Exit code: 0 if promoted, 1 if not

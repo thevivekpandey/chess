@@ -12,7 +12,7 @@ import os
 import random
 import threading
 import time
-from collections import Counter
+from collections import Counter, OrderedDict
 from contextlib import nullcontext
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -24,6 +24,11 @@ import numpy as np
 import torch
 
 from chess_engine import ChessNet, board_to_tensor, boards_to_tensors, MOVE_FLAT_INDEX_TABLE
+
+# Flat 1D view of MOVE_FLAT_INDEX_TABLE so the legal-priors hot path can index
+# with a single linear int instead of a 3-axis numpy lookup per move.
+# Shape (64, 64, 7) → strides 64*7=448, 7, 1.
+_MOVE_FLAT_INDEX_TABLE_FLAT = MOVE_FLAT_INDEX_TABLE.reshape(-1)
 
 
 # Terminal values, in WHITE's perspective, bounded to match NN value head's [-1, 1].
@@ -106,6 +111,7 @@ class MCTSNode:
         # Vectorized selection support
         "child_N", "child_W", "child_priors", "child_vlosses",
         "child_nodes", "child_moves", "index_in_parent",
+        "total_N_eff",  # incrementally maintained sum(child_N + child_vlosses)
         "_cached_legal_moves",
     )
 
@@ -137,6 +143,7 @@ class MCTSNode:
         self.child_vlosses = None
         self.child_nodes = None
         self.child_moves = None
+        self.total_N_eff = 0
         self._cached_legal_moves: Optional[List[chess.Move]] = None
 
 
@@ -154,16 +161,18 @@ def _materialize(
     node.board = new_board
 
     key = _position_key(new_board)
-    legal = None
     if engine is not None:
-        legal = engine.legal_move_cache.get(key)
-    
-    if legal is None:
+        cache = engine.legal_move_cache
+        legal = cache.get(key)
+        if legal is not None:
+            cache.move_to_end(key)
+        else:
+            legal = list(new_board.legal_moves)
+            cache[key] = legal
+            if len(cache) > engine._legal_move_cache_max:
+                cache.popitem(last=False)
+    else:
         legal = list(new_board.legal_moves)
-        if engine is not None:
-            if len(engine.legal_move_cache) > 50000:
-                engine.legal_move_cache.clear()
-            engine.legal_move_cache[key] = legal
 
     in_check = new_board.is_check()
     term = _terminal_value_given(new_board, legal, in_check)
@@ -187,6 +196,7 @@ class MCTSEngine:
         model_path: str,
         device: str = "auto",
         eval_batch_size: int = 4096,
+        verbose: bool = True,
     ):
         if device == "auto":
             if torch.cuda.is_available():
@@ -206,7 +216,8 @@ class MCTSEngine:
             
         self.model = ChessNet(initial_channels=512, res_channels=256, num_res_blocks=16)
 
-        print(f"Loading neural model from {model_path} on {self.device}...")
+        if verbose:
+            print(f"Loading neural model from {model_path} on {self.device}...")
         checkpoint = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.to(self.device)
@@ -220,7 +231,12 @@ class MCTSEngine:
             except Exception:
                 pass
 
-        self.legal_move_cache = {}
+        # Per-engine LRU cache of legal-move lists keyed by transposition key.
+        # The previous "flush at 50K" policy threw away the entire cache on
+        # overflow; LRU eviction keeps the recently-used positions, which is
+        # what MCTS actually needs (subtrees revisit the same positions).
+        self.legal_move_cache: "OrderedDict[Any, List[chess.Move]]" = OrderedDict()
+        self._legal_move_cache_max = 100000
         
         self.pinned_tensor_buffer = None
         if self.device.type == "cuda":
@@ -329,30 +345,48 @@ class MCTSEngine:
             legal_moves = list(board.legal_moves)
         if not legal_moves:
             return []
+
+        # Inline the table lookup: skip the per-move staticmethod dispatch and
+        # use a 1D linear index (m.from*448 + m.to*7 + promo) into the flat
+        # view, which is ~2× faster than per-call 3-axis numpy indexing.
+        table_flat = _MOVE_FLAT_INDEX_TABLE_FLAT
         flat_indices = []
         indexed_moves = []
         unindexed_moves = []
         for m in legal_moves:
-            flat = self._move_flat_index(m)
-            if flat is not None:
+            flat = int(table_flat[m.from_square * 448 + m.to_square * 7 + (m.promotion or 0)])
+            if flat >= 0:
                 flat_indices.append(flat)
                 indexed_moves.append(m)
             else:
                 unindexed_moves.append(m)
+
         if not indexed_moves:
             n = len(legal_moves)
             return [(m, 1.0 / n) for m in legal_moves]
+
         flat_logits = policy_logits_np.reshape(-1)
         legal_logits = flat_logits[flat_indices].astype(np.float64, copy=False)
-        legal_logits = legal_logits - legal_logits.max()
-        exp_logits = np.exp(legal_logits)
-        probs = exp_logits / exp_logits.sum()
-        result = list(zip(indexed_moves, probs.tolist()))
-        result.extend((m, 0.0) for m in unindexed_moves)
+        legal_logits -= legal_logits.max()
+        np.exp(legal_logits, out=legal_logits)
+        legal_logits /= legal_logits.sum()
+
+        result = list(zip(indexed_moves, legal_logits.tolist()))
+        if unindexed_moves:
+            result.extend((m, 0.0) for m in unindexed_moves)
         return result
 
     def make_root(self, board: chess.Board) -> MCTSNode:
-        return MCTSNode(board=board.copy(stack=False))
+        node = MCTSNode(board=board.copy(stack=False))
+        # Set terminal status up front so callers can rely on `node.is_terminal`
+        # without first running a search. advance_root already does this for
+        # subsequent roots; doing it here too lets the self-play loop use a
+        # single consistent terminal check.
+        intrinsic = terminal_score_white(node.board)
+        if intrinsic is not None:
+            node.is_terminal = True
+            node.terminal_value = intrinsic
+        return node
 
     def advance_root(self, root: MCTSNode, move: chess.Move, game_history: List[str]) -> MCTSNode:
         history_excl_self = game_history[:-1]
@@ -417,32 +451,27 @@ class MCTSEngine:
         cpuct: float,
         fpu_reduction: float,
     ) -> int:
-        is_white = (node.turn == chess.WHITE)
-        eff_N = node.child_N + node.child_vlosses
-        total_N_eff = eff_N.sum()
+        # Mover sign: +1 for white-to-move, -1 for black. Since s ∈ {-1, +1},
+        # s*s = 1, so q_mover_visited = s*(W - s*vl)/eff_N simplifies to
+        # (s*W - vl)/eff_N — one fewer multiply and avoids per-color branching.
+        s = 1.0 if node.turn == chess.WHITE else -1.0
+
+        parent_q_white = node.W / node.N if node.N > 0 else 0.0
+        fpu_baseline = s * parent_q_white - fpu_reduction
+
+        total_N_eff = node.total_N_eff
         sqrt_total = math.sqrt(total_N_eff) if total_N_eff > 0 else 1.0
 
-        if node.N > 0:
-            parent_q_white = node.W / node.N
-        else:
-            parent_q_white = 0.0
-        
-        vl_shift_white = -1.0 if is_white else 1.0
-        mask = eff_N > 0
-        
-        if mask.any():
-            if is_white:
-                q_mover = np.full(len(eff_N), parent_q_white - fpu_reduction, dtype=np.float32)
-                q_mover[mask] = (node.child_W[mask] + node.child_vlosses[mask] * vl_shift_white) / eff_N[mask]
-            else:
-                q_mover = np.full(len(eff_N), -(parent_q_white + fpu_reduction), dtype=np.float32)
-                q_mover[mask] = -(node.child_W[mask] + node.child_vlosses[mask] * vl_shift_white) / eff_N[mask]
-        else:
-            val = (parent_q_white - fpu_reduction) if is_white else -(parent_q_white + fpu_reduction)
-            q_mover = np.full(len(eff_N), val, dtype=np.float32)
+        child_N = node.child_N
+        child_vlosses = node.child_vlosses
+        eff_N = child_N + child_vlosses
+        safe_eff_N = np.maximum(eff_N, 1)
+
+        q_visited = (s * node.child_W - child_vlosses) / safe_eff_N
+        q_mover = np.where(eff_N > 0, q_visited, fpu_baseline)
 
         scores = q_mover + (cpuct * sqrt_total) * node.child_priors / (1 + eff_N)
-        return np.argmax(scores)
+        return int(np.argmax(scores))
 
     def _descend(
         self,
@@ -477,6 +506,9 @@ class MCTSEngine:
 
     @staticmethod
     def _backprop(path: List[MCTSNode], v_white: float, undo_virtual_loss: bool):
+        # total_N_eff = sum(child_N + child_vlosses). When undoing virtual loss,
+        # child_N += 1 and child_vlosses -= 1 cancel — net 0. When no vloss was
+        # applied (terminal leaf), only child_N += 1 — net +1.
         for n in path:
             if undo_virtual_loss:
                 n.virtual_loss -= 1
@@ -489,6 +521,8 @@ class MCTSEngine:
                 p.child_W[idx] = n.W
                 if undo_virtual_loss:
                     p.child_vlosses[idx] = n.virtual_loss
+                else:
+                    p.total_N_eff += 1
 
     @staticmethod
     def _is_visit_dominated(
@@ -577,6 +611,7 @@ class MCTSEngine:
                     n.virtual_loss += 1
                     if n.parent:
                         n.parent.child_vlosses[n.index_in_parent] = n.virtual_loss
+                        n.parent.total_N_eff += 1
                 batch_leaves.append(leaf)
                 batch_paths.append(path)
 

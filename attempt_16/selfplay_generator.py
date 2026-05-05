@@ -110,18 +110,18 @@ def play_selfplay_game(
     game.headers["White"] = "NeuralEngine"
     game.headers["Black"] = "NeuralEngine"
 
-    mcts_root: Optional[MCTSNode] = neural.make_root(board) if reuse_tree else None
+    # advance_root and make_root both maintain mcts_root.is_terminal, so the
+    # loop guard can use it directly instead of paying for python-chess's
+    # is_game_over(claim_draw=True) each ply (which iterates legal moves to
+    # detect threefold via push/pop).
+    mcts_root: MCTSNode = neural.make_root(board)
     position_history: List[str] = [_position_key(board)]
 
     training_examples = []
     pgn_node = game
     ply = 0
 
-    while not board.is_game_over(claim_draw=True) and ply < max_plies:
-        # Make root if needed
-        if not reuse_tree or mcts_root is None:
-            mcts_root = neural.make_root(board)
-
+    while ply < max_plies and not mcts_root.is_terminal:
         # Run MCTS search (ignore the returned move, we'll sample it ourselves)
         _, search_stats = neural.choose_move(
             mcts_root,
@@ -170,9 +170,13 @@ def play_selfplay_game(
         board.push(move)
         position_history.append(_position_key(board))
 
-        # Advance tree for reuse
-        if reuse_tree and mcts_root is not None:
+        # Refresh root so the next iteration's loop guard sees correct
+        # is_terminal status. advance_root reuses the subtree; otherwise
+        # rebuild from scratch.
+        if reuse_tree:
             mcts_root = neural.advance_root(mcts_root, move, position_history)
+        else:
+            mcts_root = neural.make_root(board)
 
         pgn_node = pgn_node.add_variation(move)
         ply += 1
@@ -196,29 +200,19 @@ def assign_game_outcome_to_examples(
         game_result: "1-0", "0-1", or "1/2-1/2"
 
     Returns:
-        Updated examples with 'value_target' added (from current player's perspective)
+        Updated examples with 'value_target' added (from white's perspective,
+        matching M0's supervised training convention and how MCTS interprets
+        the value head — see play_games_mcts.py:640).
     """
-    # Parse result
     if game_result == "1-0":
         white_outcome = 1.0
-        black_outcome = -1.0
     elif game_result == "0-1":
         white_outcome = -1.0
-        black_outcome = 1.0
-    elif game_result == "1/2-1/2":
-        white_outcome = 0.0
-        black_outcome = 0.0
     else:
-        # Unknown result, treat as draw
-        white_outcome = 0.0
-        black_outcome = 0.0
+        white_outcome = 0.0  # draw or unknown
 
     for example in training_examples:
-        # Value target from current player's perspective
-        if example['turn'] == chess.WHITE:
-            example['value_target'] = white_outcome
-        else:
-            example['value_target'] = black_outcome
+        example['value_target'] = white_outcome
 
     return training_examples
 
@@ -315,6 +309,7 @@ def _init_selfplay_worker(
         model_path,
         device=device,
         eval_batch_size=eval_batch_size,
+        verbose=False,
     )
     _WORKER_PLAY_PARAMS = play_params
 
@@ -332,9 +327,8 @@ def _run_one_selfplay_game_in_worker(game_idx: int):
 
     result = game.headers["Result"]
     training_examples = assign_game_outcome_to_examples(training_examples, result)
-    moves_str = _format_moves_san(game)
 
-    return game_idx, result, training_examples, elapsed, moves_str
+    return game_idx, result, training_examples, elapsed
 
 
 def generate_selfplay_games(
@@ -430,7 +424,6 @@ def generate_selfplay_games(
             mps = n_moves / game_elapsed if game_elapsed > 0 else 0.0
             print(f"Game {game_idx + 1}/{num_games}: {result}, "
                   f"{n_moves} positions, {game_elapsed:.1f}s, {mps:.1f} moves/s")
-            print(f"  Moves: {_format_moves_san(game)}")
     else:
         # Parallel path: workers each load their own MCTSEngine, play games
         # concurrently, return examples; main process serializes CSV writes.
@@ -445,7 +438,7 @@ def generate_selfplay_games(
             initializer=_init_selfplay_worker,
             initargs=(model_path, device, eval_batch_size, play_params, base_seed),
         ) as pool:
-            for game_idx, result, training_examples, game_elapsed, moves_str in \
+            for game_idx, result, training_examples, game_elapsed in \
                     pool.imap_unordered(
                         _run_one_selfplay_game_in_worker, range(num_games)
                     ):
@@ -459,7 +452,6 @@ def generate_selfplay_games(
                 mps = n_moves / game_elapsed if game_elapsed > 0 else 0.0
                 print(f"[{completed}/{num_games}] Game {game_idx + 1}: {result}, "
                       f"{n_moves} positions, {game_elapsed:.1f}s, {mps:.1f} moves/s")
-                print(f"  Moves: {moves_str}")
 
     total_elapsed = time.time() - start_time
     overall_mps = total_positions / total_elapsed if total_elapsed > 0 else 0.0

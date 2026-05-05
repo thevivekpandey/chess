@@ -2,10 +2,10 @@
 """
 Train neural network on self-play data using AlphaZero-style training.
 
-Loss function:
+Loss function (matches supervised training in chess_engine.py):
   - Policy loss: Cross-entropy between MCTS visit distribution and NN policy
-  - Value loss: MSE between game outcome and NN value prediction
-  - Total loss = policy_loss + value_loss
+  - Value loss: SmoothL1(beta=0.2) between game outcome and NN value prediction
+  - Total loss = value_loss + 0.1 * policy_loss
 """
 
 import argparse
@@ -182,11 +182,11 @@ def compute_loss(
     log_probs = F.log_softmax(masked_logits_flat, dim=1)
     policy_loss = -(policy_targets_flat * log_probs).sum(dim=1).mean()
 
-    # Value loss: MSE
-    value_loss = F.mse_loss(value_pred, value_targets)
+    # Value loss: SmoothL1 (beta=0.2), matching supervised training in chess_engine.py
+    value_loss = F.smooth_l1_loss(value_pred, value_targets, beta=0.2)
 
-    # Total loss
-    total_loss = policy_loss + value_loss
+    # Total loss: value + 0.1 * policy, matching supervised training (policy_weight=0.1)
+    total_loss = value_loss + 0.1 * policy_loss
 
     return total_loss, policy_loss, value_loss
 
@@ -241,6 +241,7 @@ def train(
     device: str = "cpu",
     save_every: int = 100,
     print_every: int = 10,
+    optimizer_state_path: str = None,
 ):
     """
     Train neural network on self-play data.
@@ -255,6 +256,9 @@ def train(
         device: "cpu" or "cuda"
         save_every: Save checkpoint every N batches
         print_every: Print stats every N batches
+        optimizer_state_path: If set, load Adam state from this path at start
+            and save it back at the end. Lets pipeline iterations preserve
+            Adam's running gradient statistics across restarts.
     """
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -272,20 +276,24 @@ def train(
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Load replay buffer
-    print(f"Loading replay buffer from {replay_buffer_path}...")
+    # Warm-start Adam from a previous iteration's running statistics. If the
+    # file doesn't exist (first iteration), Adam starts cold — that's fine.
+    if optimizer_state_path is not None and os.path.exists(optimizer_state_path):
+        try:
+            opt_state = torch.load(optimizer_state_path, map_location=device)
+            optimizer.load_state_dict(opt_state)
+            print(f"Loaded optimizer state from {optimizer_state_path}")
+        except Exception as e:
+            print(f"WARN: could not load optimizer state from {optimizer_state_path}: {e}")
+
     replay_buffer = ReplayBuffer(replay_buffer_path, max_positions=500000)
-    replay_buffer.print_statistics()
 
     if replay_buffer.is_empty():
         print("ERROR: Replay buffer is empty! Generate self-play data first.")
         return
 
-    print(f"\nStarting training for {num_batches} batches...")
-    print(f"Batch size: {batch_size}")
-    print(f"Learning rate: {learning_rate}")
-    print(f"Device: {device}")
-    print()
+    print(f"Starting training for {num_batches} batches "
+          f"(buffer={replay_buffer.size()}, batch={batch_size}, lr={learning_rate}, device={device})")
 
     start_time = time.time()
     running_losses = {'total': 0.0, 'policy': 0.0, 'value': 0.0}
@@ -333,6 +341,11 @@ def train(
         'optimizer_state_dict': optimizer.state_dict(),
         'batch': num_batches,
     }, final_path)
+
+    # Persist optimizer state to a stable path so the next iteration can pick
+    # up Adam's running gradient stats even when the new model wasn't promoted.
+    if optimizer_state_path is not None:
+        torch.save(optimizer.state_dict(), optimizer_state_path)
 
     total_time = time.time() - start_time
     print(f"\nTraining complete!")
