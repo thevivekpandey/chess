@@ -1,0 +1,6 @@
+PYTHONUNBUFFERED=1 nohup ~/myvenv/bin/python selfplay_pipeline.py --best-model attempt_14b_epoch032.pt --work-dir   
+  selfplay_run09 --iterations 50 --games-per-iteration 1000 --eval-games 200 --device cuda --parallel-games 24        
+  --parallel-eval-games 12 --prefill-iterations 5 --prefill-cache-dir prefill_cache_1600_direchlet_cpucut_1_25/       
+  --selfplay-simulations 1600 --eval-simulations 1600 --mcts-batch-size 32 --cpuct 1.25 --learning-rate 3e-5          
+  --early-exit-min-sims 800 > selfplay_run09.log 2>&1 &
+

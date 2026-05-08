@@ -20,8 +20,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import chess
 import chess.engine
 import chess.pgn
+import cython_chess
 import numpy as np
 import torch
+from numba import njit
 
 from chess_engine import ChessNet, board_to_tensor, boards_to_tensors, MOVE_FLAT_INDEX_TABLE
 
@@ -29,6 +31,28 @@ from chess_engine import ChessNet, board_to_tensor, boards_to_tensors, MOVE_FLAT
 # with a single linear int instead of a 3-axis numpy lookup per move.
 # Shape (64, 64, 7) → strides 64*7=448, 7, 1.
 _MOVE_FLAT_INDEX_TABLE_FLAT = MOVE_FLAT_INDEX_TABLE.reshape(-1)
+
+
+@njit(cache=True, fastmath=True)
+def _puct_argmax_core(s, fpu_baseline, cpuct_sqrtN,
+                      child_N, child_W, child_vlosses, child_priors):
+    # Single-pass PUCT argmax with no array allocations. All inputs are
+    # scalars or 1-D numpy arrays (child_N/vlosses int32, child_W/priors
+    # float32). Returns the argmax index.
+    n = child_N.shape[0]
+    best_idx = 0
+    best_score = -1e30
+    for i in range(n):
+        eff = child_N[i] + child_vlosses[i]
+        if eff > 0:
+            q_mover = (s * child_W[i] - child_vlosses[i]) / eff
+        else:
+            q_mover = fpu_baseline
+        score = q_mover + cpuct_sqrtN * child_priors[i] / (1 + eff)
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
 
 
 # Terminal values, in WHITE's perspective, bounded to match NN value head's [-1, 1].
@@ -75,7 +99,7 @@ def _terminal_value_given(
 
 
 def terminal_score_white(board: chess.Board) -> Optional[float]:
-    legal = list(board.legal_moves)
+    legal = list(cython_chess.generate_legal_moves(board, chess.BB_ALL, chess.BB_ALL))
     return _terminal_value_given(board, legal, board.is_check())
 
 
@@ -167,12 +191,12 @@ def _materialize(
         if legal is not None:
             cache.move_to_end(key)
         else:
-            legal = list(new_board.legal_moves)
+            legal = list(cython_chess.generate_legal_moves(new_board, chess.BB_ALL, chess.BB_ALL))
             cache[key] = legal
             if len(cache) > engine._legal_move_cache_max:
                 cache.popitem(last=False)
     else:
-        legal = list(new_board.legal_moves)
+        legal = list(cython_chess.generate_legal_moves(new_board, chess.BB_ALL, chess.BB_ALL))
 
     in_check = new_board.is_check()
     term = _terminal_value_given(new_board, legal, in_check)
@@ -266,28 +290,15 @@ class MCTSEngine:
             return None, None
             
         actual_size = len(boards)
-        if actual_size == 1:
-            pad_to = 1
-        elif actual_size <= 8:
-            pad_to = 8
-        elif actual_size <= 16:
-            pad_to = 16
-        elif actual_size <= 32:
-            pad_to = 32
-        elif actual_size <= 64:
-            pad_to = 64
-        elif actual_size <= 128:
-            pad_to = 128
-        else:
-            pad_to = self.eval_batch_size
-            
+        # Use bfloat16 for H100
+        amp_dtype = torch.bfloat16 if self.device.type == 'cuda' else torch.float32
+        amp_ctx = (
+            torch.autocast(device_type=self.device.type, dtype=amp_dtype)
+            if self.device.type in ['cuda', 'cpu'] else nullcontext()
+        )
+        
         val_chunks: Optional[List[np.ndarray]] = [] if need_value else None
         pol_chunks: Optional[List[np.ndarray]] = [] if need_policy else None
-        
-        amp_ctx = (
-            torch.autocast(device_type='cuda', dtype=torch.bfloat16)
-            if self.device.type == 'cuda' else nullcontext()
-        )
         
         with torch.inference_mode(), amp_ctx:
             for start in range(0, actual_size, self.eval_batch_size):
@@ -295,33 +306,24 @@ class MCTSEngine:
                 end = min(start + self.eval_batch_size, actual_size)
                 chunk = boards[start:end]
                 curr_actual = len(chunk)
-                curr_pad_to = pad_to if actual_size <= self.eval_batch_size else curr_actual
                 
-                if self.pinned_tensor_buffer is not None and curr_pad_to <= self.eval_batch_size:
+                if self.pinned_tensor_buffer is not None:
                     # Optimized batch encoding directly into pinned buffer
-                    boards_to_tensors(chunk, self.pinned_tensor_buffer)
-                    
-                    if curr_actual < curr_pad_to:
-                        # Pad with copies of the last board
-                        last_board_tensor = self.pinned_tensor_buffer[curr_actual - 1:curr_actual]
-                        padding = last_board_tensor.expand(curr_pad_to - curr_actual, -1, -1, -1)
-                        self.pinned_tensor_buffer[curr_actual:curr_pad_to].copy_(padding)
-                    
-                    tensors = self.pinned_tensor_buffer[:curr_pad_to].to(self.device, non_blocking=True)
+                    boards_to_tensors(chunk, self.pinned_tensor_buffer[:curr_actual])
+                    tensors = self.pinned_tensor_buffer[:curr_actual].to(self.device, non_blocking=True)
                 else:
-                    # Fallback for non-CUDA or overflow
-                    tensors = torch.stack([board_to_tensor(b) for b in chunk])
-                    if curr_actual < curr_pad_to:
-                        padding_count = curr_pad_to - curr_actual
-                        padding = tensors[-1:].expand(padding_count, -1, -1, -1)
-                        tensors = torch.cat([tensors, padding], dim=0)
-                    tensors = tensors.to(self.device, non_blocking=True)
+                    # Fallback
+                    tensors = torch.stack([board_to_tensor(b) for b in chunk]).to(self.device, non_blocking=True)
+
+                # Explicitly cast to amp_dtype if not using autocast or if needed
+                if self.device.type == 'cuda':
+                    tensors = tensors.to(dtype=amp_dtype)
 
                 values, policies = self.model(tensors)
                 if need_value:
-                    val_chunks.append(values[:curr_actual].float().cpu().numpy().reshape(-1))
+                    val_chunks.append(values.float().cpu().numpy().reshape(-1))
                 if need_policy:
-                    pol_chunks.append(policies[:curr_actual].float().cpu().numpy())
+                    pol_chunks.append(policies.float().cpu().numpy())
                     
         return (
             np.concatenate(val_chunks) if need_value else None,
@@ -342,39 +344,49 @@ class MCTSEngine:
         legal_moves: Optional[List[chess.Move]] = None,
     ) -> List[Tuple[chess.Move, float]]:
         if legal_moves is None:
-            legal_moves = list(board.legal_moves)
-        if not legal_moves:
+            legal_moves = list(cython_chess.generate_legal_moves(board, chess.BB_ALL, chess.BB_ALL))
+        n = len(legal_moves)
+        if n == 0:
             return []
 
-        # Inline the table lookup: skip the per-move staticmethod dispatch and
-        # use a 1D linear index (m.from*448 + m.to*7 + promo) into the flat
-        # view, which is ~2× faster than per-call 3-axis numpy indexing.
-        table_flat = _MOVE_FLAT_INDEX_TABLE_FLAT
-        flat_indices = []
-        indexed_moves = []
-        unindexed_moves = []
-        for m in legal_moves:
-            flat = int(table_flat[m.from_square * 448 + m.to_square * 7 + (m.promotion or 0)])
-            if flat >= 0:
-                flat_indices.append(flat)
-                indexed_moves.append(m)
-            else:
-                unindexed_moves.append(m)
+        # Vectorized: extract move fields into numpy arrays, do one bulk
+        # table lookup, then mask out unindexed moves.
+        from_sq = np.empty(n, dtype=np.int64)
+        to_sq = np.empty(n, dtype=np.int64)
+        promo = np.empty(n, dtype=np.int64)
+        for i, m in enumerate(legal_moves):
+            from_sq[i] = m.from_square
+            to_sq[i] = m.to_square
+            p = m.promotion
+            promo[i] = 0 if p is None else p
 
-        if not indexed_moves:
-            n = len(legal_moves)
+        flat_keys = from_sq * 448 + to_sq * 7 + promo
+        flat_lookups = _MOVE_FLAT_INDEX_TABLE_FLAT[flat_keys]
+        indexed_mask = flat_lookups >= 0
+
+        if not indexed_mask.any():
             return [(m, 1.0 / n) for m in legal_moves]
 
+        flat_indices = flat_lookups[indexed_mask]
         flat_logits = policy_logits_np.reshape(-1)
         legal_logits = flat_logits[flat_indices].astype(np.float64, copy=False)
         legal_logits -= legal_logits.max()
         np.exp(legal_logits, out=legal_logits)
         legal_logits /= legal_logits.sum()
 
-        result = list(zip(indexed_moves, legal_logits.tolist()))
-        if unindexed_moves:
-            result.extend((m, 0.0) for m in unindexed_moves)
-        return result
+        # Preserve the original output order: indexed moves first (in their
+        # encounter order), then unindexed moves with 0.0 prior. Order affects
+        # argmax tie-breaking in _select_child_idx for 0-prior children.
+        priors = legal_logits.tolist()
+        indexed_pairs = []
+        unindexed_pairs = []
+        prior_iter = iter(priors)
+        for m, ok in zip(legal_moves, indexed_mask.tolist()):
+            if ok:
+                indexed_pairs.append((m, next(prior_iter)))
+            else:
+                unindexed_pairs.append((m, 0.0))
+        return indexed_pairs + unindexed_pairs
 
     def make_root(self, board: chess.Board) -> MCTSNode:
         node = MCTSNode(board=board.copy(stack=False))
@@ -461,17 +473,12 @@ class MCTSEngine:
 
         total_N_eff = node.total_N_eff
         sqrt_total = math.sqrt(total_N_eff) if total_N_eff > 0 else 1.0
+        cpuct_sqrtN = cpuct * sqrt_total
 
-        child_N = node.child_N
-        child_vlosses = node.child_vlosses
-        eff_N = child_N + child_vlosses
-        safe_eff_N = np.maximum(eff_N, 1)
-
-        q_visited = (s * node.child_W - child_vlosses) / safe_eff_N
-        q_mover = np.where(eff_N > 0, q_visited, fpu_baseline)
-
-        scores = q_mover + (cpuct * sqrt_total) * node.child_priors / (1 + eff_N)
-        return int(np.argmax(scores))
+        return _puct_argmax_core(
+            s, fpu_baseline, cpuct_sqrtN,
+            node.child_N, node.child_W, node.child_vlosses, node.child_priors,
+        )
 
     def _descend(
         self,

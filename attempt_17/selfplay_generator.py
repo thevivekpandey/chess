@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 import chess
 import chess.pgn
+import cython_chess
 import numpy as np
 import torch
 
@@ -144,7 +145,7 @@ def play_selfplay_game(
         move_visits_dict = {mv: visits for mv, visits, _, _ in top_moves}
 
         # Get all legal moves and their visit counts
-        legal_moves = list(board.legal_moves)
+        legal_moves = list(cython_chess.generate_legal_moves(board, chess.BB_ALL, chess.BB_ALL))
         move_uci_list = [mv.uci() for mv in legal_moves]
         visit_counts = [move_visits_dict.get(mv, 0) for mv in legal_moves]
 

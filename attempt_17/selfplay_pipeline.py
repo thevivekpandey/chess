@@ -53,6 +53,7 @@ def run_pipeline(
     verbose: bool = False,
     dirichlet_alpha: float = 0.3,
     dirichlet_epsilon: float = 0.25,
+    cpuct: float = 2.0,
 ):
     """
     Run the complete self-play training pipeline.
@@ -125,6 +126,7 @@ def run_pipeline(
     if dirichlet_epsilon > 0:
         print(f"  Dirichlet noise: alpha={dirichlet_alpha}, epsilon={dirichlet_epsilon}")
     print(f"  Eval simulations: {eval_simulations}")
+    print(f"  cpuct: {cpuct}")
     print(f"  MCTS leaf-parallel batch: {mcts_batch_size}")
     print(f"  NN forward batch: {nn_batch_size}")
     print(f"  Early-exit min sims: {early_exit_min_sims}")
@@ -173,6 +175,7 @@ def run_pipeline(
                     n_simulations=selfplay_simulations,
                     mcts_batch_size=mcts_batch_size,
                     eval_batch_size=nn_batch_size,
+                    cpuct=cpuct,
                     early_exit_min_sims=early_exit_min_sims,
                     temperature_moves=30,
                     device=device,
@@ -214,6 +217,7 @@ def run_pipeline(
                 n_simulations=selfplay_simulations,
                 mcts_batch_size=mcts_batch_size,
                 eval_batch_size=nn_batch_size,
+                cpuct=cpuct,
                 early_exit_min_sims=early_exit_min_sims,
                 temperature_moves=30,  # Use temperature sampling for first 30 moves
                 device=device,
@@ -266,6 +270,7 @@ def run_pipeline(
             n_simulations=eval_simulations,
             mcts_batch_size=mcts_batch_size,
             eval_batch_size=nn_batch_size,
+            cpuct=cpuct,
             device=device,
             win_threshold=win_threshold,
             parallel_games=parallel_eval_games,
@@ -465,6 +470,12 @@ def main():
         default=0.25,
         help="Epsilon for Dirichlet noise (default: 0.25)"
     )
+    parser.add_argument(
+        "--cpuct",
+        type=float,
+        default=2.0,
+        help="PUCT exploration constant (default: 2.0). AlphaZero uses 1.25."
+    )
 
     args = parser.parse_args()
 
@@ -499,6 +510,7 @@ def main():
         verbose=args.verbose,
         dirichlet_alpha=args.dirichlet_alpha,
         dirichlet_epsilon=args.dirichlet_epsilon,
+        cpuct=args.cpuct,
     )
 
 
