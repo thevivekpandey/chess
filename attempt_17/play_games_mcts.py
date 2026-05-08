@@ -85,14 +85,23 @@ def pick_engine_color(mode: str, game_idx: int) -> chess.Color:
 def _terminal_value_given(
     board: chess.Board,
     legal_moves: List[chess.Move],
-    in_check: bool,
+    # Remove in_check from signature, compute lazily
 ) -> Optional[float]:
     if not legal_moves:
-        if in_check:
+        # Only call is_check() if it's actually needed for mate detection
+        if board.is_check():
             return TERMINAL_LOSS_WHITE if board.turn == chess.WHITE else TERMINAL_WIN_WHITE
         return TERMINAL_DRAW  # stalemate
+    
+    # halfmove_clock is a simple integer access
     if board.halfmove_clock >= 100:
         return TERMINAL_DRAW
+        
+    # is_insufficient_material is expensive. Fast-path: if there are pawns, 
+    # it's not insufficient material.
+    if board.pawns or board.rooks or board.queens:
+        return None
+        
     if board.is_insufficient_material():
         return TERMINAL_DRAW
     return None
@@ -100,7 +109,7 @@ def _terminal_value_given(
 
 def terminal_score_white(board: chess.Board) -> Optional[float]:
     legal = list(cython_chess.generate_legal_moves(board, chess.BB_ALL, chess.BB_ALL))
-    return _terminal_value_given(board, legal, board.is_check())
+    return _terminal_value_given(board, legal)
 
 
 def _position_key(board: chess.Board):
@@ -198,8 +207,7 @@ def _materialize(
     else:
         legal = list(cython_chess.generate_legal_moves(new_board, chess.BB_ALL, chess.BB_ALL))
 
-    in_check = new_board.is_check()
-    term = _terminal_value_given(new_board, legal, in_check)
+    term = _terminal_value_given(new_board, legal)
     if term is not None:
         node.is_terminal = True
         node.terminal_value = term
@@ -290,6 +298,24 @@ class MCTSEngine:
             return None, None
             
         actual_size = len(boards)
+        # Bucketing for torch.compile stability
+        if actual_size == 1:
+            pad_to = 1
+        elif actual_size <= 8:
+            pad_to = 8
+        elif actual_size <= 16:
+            pad_to = 16
+        elif actual_size <= 32:
+            pad_to = 32
+        elif actual_size <= 64:
+            pad_to = 64
+        elif actual_size <= 128:
+            pad_to = 128
+        elif actual_size <= 256:
+            pad_to = 256
+        else:
+            pad_to = self.eval_batch_size
+
         # Use bfloat16 for H100
         amp_dtype = torch.bfloat16 if self.device.type == 'cuda' else torch.float32
         amp_ctx = (
@@ -306,24 +332,35 @@ class MCTSEngine:
                 end = min(start + self.eval_batch_size, actual_size)
                 chunk = boards[start:end]
                 curr_actual = len(chunk)
+                curr_pad_to = pad_to if actual_size <= self.eval_batch_size else curr_actual
                 
                 if self.pinned_tensor_buffer is not None:
                     # Optimized batch encoding directly into pinned buffer
                     boards_to_tensors(chunk, self.pinned_tensor_buffer[:curr_actual])
-                    tensors = self.pinned_tensor_buffer[:curr_actual].to(self.device, non_blocking=True)
+                    
+                    if curr_actual < curr_pad_to:
+                        # Pad with copies of the last board to maintain stable shape
+                        last_tensor = self.pinned_tensor_buffer[curr_actual-1:curr_actual]
+                        padding = last_tensor.expand(curr_pad_to - curr_actual, -1, -1, -1)
+                        self.pinned_tensor_buffer[curr_actual:curr_pad_to].copy_(padding)
+                        
+                    tensors = self.pinned_tensor_buffer[:curr_pad_to].to(self.device, non_blocking=True)
                 else:
                     # Fallback
-                    tensors = torch.stack([board_to_tensor(b) for b in chunk]).to(self.device, non_blocking=True)
+                    tensors = torch.stack([board_to_tensor(b) for b in chunk])
+                    if curr_actual < curr_pad_to:
+                        padding = tensors[-1:].expand(curr_pad_to - curr_actual, -1, -1, -1)
+                        tensors = torch.cat([tensors, padding], dim=0)
+                    tensors = tensors.to(self.device, non_blocking=True)
 
-                # Explicitly cast to amp_dtype if not using autocast or if needed
                 if self.device.type == 'cuda':
                     tensors = tensors.to(dtype=amp_dtype)
 
                 values, policies = self.model(tensors)
                 if need_value:
-                    val_chunks.append(values.float().cpu().numpy().reshape(-1))
+                    val_chunks.append(values[:curr_actual].float().cpu().numpy().reshape(-1))
                 if need_policy:
-                    pol_chunks.append(policies.float().cpu().numpy())
+                    pol_chunks.append(policies[:curr_actual].float().cpu().numpy())
                     
         return (
             np.concatenate(val_chunks) if need_value else None,
@@ -487,9 +524,11 @@ class MCTSEngine:
         fpu_reduction: float,
         game_history_counts: Counter,
         path_counts: Dict[Tuple, int],
-    ) -> Tuple[MCTSNode, List[MCTSNode]]:
+        board: chess.Board,
+    ) -> Tuple[MCTSNode, List[MCTSNode], List[chess.Move]]:
         node = root
         path = [node]
+        moves_made = []
         while node.expanded and not node.is_terminal:
             idx = self._select_child_idx(node, cpuct, fpu_reduction)
             child = node.child_nodes[idx]
@@ -501,15 +540,47 @@ class MCTSEngine:
                 node.child_nodes[idx] = child
                 node.children[move] = child
 
-            _materialize(child, game_history_counts, path_counts, engine=self)
+            move = child.parent_move
+            board.push(move)
+            moves_made.append(move)
+            
+            if child.board is None:
+                # Lazy materialize: check terminal/repetition using scratch board
+                key = _position_key(board)
+                count = game_history_counts.get(key, 0) + path_counts.get(key, 0)
+                if count + 1 >= 3:
+                    child.is_terminal = True
+                    child.terminal_value = TERMINAL_DRAW
+                else:
+                    cache = self.legal_move_cache
+                    legal = cache.get(key)
+                    if legal is not None:
+                        cache.move_to_end(key)
+                    else:
+                        legal = list(cython_chess.generate_legal_moves(board, chess.BB_ALL, chess.BB_ALL))
+                        cache[key] = legal
+                        if len(cache) > self._legal_move_cache_max:
+                            cache.popitem(last=False)
+                    
+                    term = _terminal_value_given(board, legal)
+                    if term is not None:
+                        child.is_terminal = True
+                        child.terminal_value = term
+                    else:
+                        child._cached_legal_moves = legal
+                
+                # Leaf nodes (unexpanded) MUST have a board for NN evaluation
+                if not child.expanded:
+                    child.board = board.copy(stack=False)
+
             node = child
             path.append(node)
             
             if not node.is_terminal:
-                key = _position_key(node.board)
+                key = _position_key(board)
                 path_counts[key] = path_counts.get(key, 0) + 1
                 
-        return node, path
+        return node, path, moves_made
 
     @staticmethod
     def _backprop(path: List[MCTSNode], v_white: float, undo_virtual_loss: bool):
@@ -604,6 +675,7 @@ class MCTSEngine:
 
         n_done = 0
         early_exit_triggered = False
+        scratch_board = root.board.copy(stack=False)
         while n_done < n_sims:
             if self._is_visit_dominated(root, n_sims, n_done, early_exit_min_sims):
                 early_exit_triggered = True
@@ -615,8 +687,12 @@ class MCTSEngine:
 
             while len(batch_leaves) < target and (n_done + len(batch_leaves)) < n_sims:
                 path_counts = {} 
-                leaf, path = self._descend(root, cpuct, fpu_reduction, history_counts, path_counts)
+                leaf, path, moves_made = self._descend(root, cpuct, fpu_reduction, history_counts, path_counts, scratch_board)
                 
+                # Pop moves to return scratch_board to root state
+                for _ in range(len(moves_made)):
+                    scratch_board.pop()
+
                 if leaf.is_terminal:
                     self._backprop(path, leaf.terminal_value, undo_virtual_loss=False)
                     n_done += 1
