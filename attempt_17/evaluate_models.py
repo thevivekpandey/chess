@@ -194,7 +194,7 @@ def evaluate_models(
     opening_temperature_plies: int = 10,
     opening_temperature: float = 0.5,
     verbose: bool = False,
-    win_threshold: float = 0.55,
+    win_threshold: float = 0.50,
     parallel_games: int = 1,
 ) -> Tuple[bool, dict]:
     """
@@ -315,8 +315,8 @@ def evaluate_models(
     # gate promotion on, so a draw-heavy improvement still counts.
     new_score = (results['new_wins'] + 0.5 * results['draws']) / total_games
 
-    # Decide if new model should be promoted
-    should_promote = new_score >= win_threshold
+    # Decide if new model should be promoted (strictly greater than threshold)
+    should_promote = new_score > win_threshold
 
     # Print summary
     print("\n" + "=" * 60)
@@ -331,9 +331,9 @@ def evaluate_models(
     print()
 
     if should_promote:
-        print(f"✓ NEW MODEL PROMOTED (score {new_score * 100:.1f}% >= {win_threshold * 100:.0f}%)")
+        print(f"✓ NEW MODEL PROMOTED (score {new_score * 100:.1f}% > {win_threshold * 100:.0f}%)")
     else:
-        print(f"✗ New model NOT promoted (score {new_score * 100:.1f}% < {win_threshold * 100:.0f}%)")
+        print(f"✗ New model NOT promoted (score {new_score * 100:.1f}% <= {win_threshold * 100:.0f}%)")
     print("=" * 60)
 
     statistics = {
@@ -380,8 +380,8 @@ def main():
     parser.add_argument(
         "--win-threshold",
         type=float,
-        default=0.55,
-        help="Minimum win rate to promote (default: 0.55)"
+        default=0.50,
+        help="Minimum win rate to promote (default: 0.50, strictly greater than)"
     )
     parser.add_argument(
         "--device",

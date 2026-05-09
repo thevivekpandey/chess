@@ -35,7 +35,7 @@ def run_pipeline(
     iterations: int = 100,
     games_per_iteration: int = 100,
     train_batches: int = 2000,
-    eval_games: int = 100,
+    eval_games: int = 500,
     batch_size: int = 256,
     learning_rate: float = 1e-4,
     device: str = "cpu",
@@ -44,7 +44,7 @@ def run_pipeline(
     mcts_batch_size: int = 128,
     nn_batch_size: int = 512,
     early_exit_min_sims: int = 200,
-    win_threshold: float = 0.55,
+    win_threshold: float = 0.50,
     parallel_games: int = 1,
     parallel_eval_games: int = 1,
     prefill_iterations: int = 0,
@@ -254,9 +254,6 @@ def run_pipeline(
         )
 
         new_model_path = os.path.join(training_output, "model_final.pt")
-        # Advance the trunk so the next iteration continues from this candidate.
-        # Self-play / eval still use current_best_path until promotion.
-        shutil.copy(new_model_path, current_train_path)
         train_elapsed = time.time() - train_start
 
         # Step 4: Evaluate new model
@@ -284,6 +281,10 @@ def run_pipeline(
             print(f"\n✓ Promoting new model as best model!")
             shutil.copy(new_model_path, current_best_path)
 
+            # Advance trunk to promoted model
+            shutil.copy(new_model_path, current_train_path)
+            print(f"  Training trunk advanced to promoted model")
+
             # Also save a dated backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = os.path.join(models_dir, f"best_model_{timestamp}.pt")
@@ -293,6 +294,15 @@ def run_pipeline(
             promotions += 1
         else:
             print(f"\n✗ Keeping current best model")
+
+            # CRITICAL: Reset trunk to current best (don't compound degradation)
+            shutil.copy(current_best_path, current_train_path)
+            print(f"  Training trunk reset to best model (discarding failed candidate)")
+
+            # Reset optimizer state for fresh start next iteration
+            if os.path.exists(optimizer_state_path):
+                os.remove(optimizer_state_path)
+                print(f"  Optimizer state reset for next attempt")
 
         # Iteration summary
         iteration_elapsed = time.time() - iteration_start
@@ -367,8 +377,8 @@ def main():
     parser.add_argument(
         "--eval-games",
         type=int,
-        default=100,
-        help="Evaluation games per iteration (default: 100)"
+        default=500,
+        help="Evaluation games per iteration (default: 500)"
     )
     parser.add_argument(
         "--batch-size",
@@ -421,8 +431,8 @@ def main():
     parser.add_argument(
         "--win-threshold",
         type=float,
-        default=0.55,
-        help="Win rate threshold for promotion (default: 0.55)"
+        default=0.50,
+        help="Win rate threshold for promotion (default: 0.50, strictly greater than)"
     )
     parser.add_argument(
         "--parallel-games",
