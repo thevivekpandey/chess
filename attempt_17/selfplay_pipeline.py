@@ -18,6 +18,7 @@ Usage:
 """
 
 import argparse
+import glob
 import os
 import shutil
 import time
@@ -44,11 +45,12 @@ def run_pipeline(
     mcts_batch_size: int = 128,
     nn_batch_size: int = 512,
     early_exit_min_sims: int = 200,
-    win_threshold: float = 0.50,
+    win_threshold: float = 0.51,
     parallel_games: int = 1,
     parallel_eval_games: int = 1,
     prefill_iterations: int = 0,
     prefill_cache_dir: str = "",
+    resume_from_dir: str = "",
     skip_first_selfplay: bool = False,
     verbose: bool = False,
     dirichlet_alpha: float = 0.3,
@@ -95,6 +97,55 @@ def run_pipeline(
     # tracking.
     current_train_path = os.path.join(models_dir, "train_trunk.pt")
     optimizer_state_path = os.path.join(work_dir, "optimizer_state.pt")
+
+    # Resume from a previous run's work dir: copy over best_model, train_trunk,
+    # replay_buffer, optimizer_state (if present), and prior iteration CSVs.
+    # Prior iter CSVs are prefixed with the source dir's basename so they
+    # don't collide with this run's iter outputs.
+    if resume_from_dir:
+        if not os.path.isdir(resume_from_dir):
+            raise FileNotFoundError(f"--resume-from-dir not found: {resume_from_dir}")
+        src_best = os.path.join(resume_from_dir, "models", "best_model.pt")
+        src_trunk = os.path.join(resume_from_dir, "models", "train_trunk.pt")
+        src_buffer = os.path.join(resume_from_dir, "replay_buffer.csv")
+        src_optim = os.path.join(resume_from_dir, "optimizer_state.pt")
+        src_iter_glob = os.path.join(resume_from_dir, "selfplay_games", "iteration_*.csv")
+
+        missing = [p for p in (src_best, src_trunk, src_buffer) if not os.path.exists(p)]
+        if missing:
+            raise FileNotFoundError(
+                f"--resume-from-dir is missing required files: {missing}"
+            )
+
+        print(f"\nResuming from {resume_from_dir}")
+        # Refuse to clobber existing state in the new work_dir.
+        for dst in (current_best_path, current_train_path, replay_buffer_path):
+            if os.path.exists(dst):
+                raise FileExistsError(
+                    f"Refusing to overwrite existing file in work_dir during resume: {dst}"
+                )
+
+        shutil.copy(src_best, current_best_path)
+        print(f"  best_model:    {src_best} -> {current_best_path}")
+        shutil.copy(src_trunk, current_train_path)
+        print(f"  train_trunk:   {src_trunk} -> {current_train_path}")
+        shutil.copy(src_buffer, replay_buffer_path)
+        print(f"  replay_buffer: {src_buffer} -> {replay_buffer_path}")
+        if os.path.exists(src_optim):
+            shutil.copy(src_optim, optimizer_state_path)
+            print(f"  optimizer:     {src_optim} -> {optimizer_state_path}")
+        else:
+            print(f"  optimizer:     (none in source — will start fresh)")
+
+        prefix = os.path.basename(os.path.normpath(resume_from_dir))
+        iter_csvs = sorted(glob.glob(src_iter_glob))
+        for src_csv in iter_csvs:
+            dst_csv = os.path.join(
+                selfplay_dir, f"{prefix}_{os.path.basename(src_csv)}"
+            )
+            shutil.copy(src_csv, dst_csv)
+        if iter_csvs:
+            print(f"  iter csvs:     copied {len(iter_csvs)} files with prefix '{prefix}_'")
 
     # Copy initial model as both best model and training trunk.
     if not os.path.exists(current_best_path):
@@ -348,8 +399,9 @@ def main():
     )
     parser.add_argument(
         "--best-model",
-        required=True,
-        help="Path to initial best model checkpoint"
+        required=False,
+        default="",
+        help="Path to initial best model checkpoint. Required unless --resume-from-dir is given."
     )
     parser.add_argument(
         "--work-dir",
@@ -431,8 +483,8 @@ def main():
     parser.add_argument(
         "--win-threshold",
         type=float,
-        default=0.50,
-        help="Win rate threshold for promotion (default: 0.50, strictly greater than)"
+        default=0.51,
+        help="Win rate threshold for promotion (default: 0.51, strictly greater than)"
     )
     parser.add_argument(
         "--parallel-games",
@@ -457,6 +509,12 @@ def main():
         type=str,
         default="",
         help="Shared directory for pre-fill CSVs. If a prefill_NNNN.csv already exists there, it is reused; otherwise it is generated and saved there. Lets you reuse pre-fill data across runs. (default: empty -> per-run dir)"
+    )
+    parser.add_argument(
+        "--resume-from-dir",
+        type=str,
+        default="",
+        help="Resume from a previous run's work dir. Copies over best_model, train_trunk, replay_buffer, optimizer_state (if present), and prior iteration CSVs. Refuses to clobber existing files in the new work_dir."
     )
     parser.add_argument(
         "--skip-first-selfplay",
@@ -489,10 +547,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Expand ~ in path
-    best_model_path = os.path.expanduser(args.best_model)
+    # When resuming, --best-model is optional (model comes from resume dir).
+    if not args.best_model and not args.resume_from_dir:
+        print("ERROR: must provide --best-model or --resume-from-dir")
+        exit(1)
 
-    if not os.path.exists(best_model_path):
+    best_model_path = os.path.expanduser(args.best_model) if args.best_model else ""
+
+    if best_model_path and not os.path.exists(best_model_path):
         print(f"ERROR: Best model not found: {best_model_path}")
         exit(1)
 
@@ -516,6 +578,7 @@ def main():
         parallel_eval_games=args.parallel_eval_games,
         prefill_iterations=args.prefill_iterations,
         prefill_cache_dir=args.prefill_cache_dir,
+        resume_from_dir=args.resume_from_dir,
         skip_first_selfplay=args.skip_first_selfplay,
         verbose=args.verbose,
         dirichlet_alpha=args.dirichlet_alpha,
