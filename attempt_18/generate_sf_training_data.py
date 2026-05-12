@@ -2,273 +2,255 @@
 Policy-Only Game Generator with Stockfish Labeling
 
 Generates training data by:
-1. Playing games using only the policy network (no MCTS)
-2. Labeling each position with Stockfish multi-PV and evaluation
-3. Converting SF output to policy and value targets
+1. Playing games using only the policy network (no MCTS, ~10ms/move)
+2. Labeling each visited (non-terminal) position with Stockfish multi-PV + eval
+3. Writing rows in the project CSV format used by chess_engine.load_data_from_csv:
 
-This is much faster than MCTS-based generation (~10ms vs 3-5s per move)
-and provides diverse training data from a strong teacher.
+   fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5
+
+   - eval  : position evaluation in PAWNS, from WHITE's perspective
+             (matches the foundation dataset and the ChessNet value head, which
+             chess_engine.ChessDataset feeds straight through normalize_eval()).
+   - moveN : UCI strings for Stockfish's top-N principal variations.
+   - scoreN: evaluation in CENTIPAWNS after that move, from the SIDE-TO-MOVE's
+             perspective, so the best move always has the highest score. This is
+             what chess_engine.moves_to_policy_sparse() expects, and matches the
+             foundation dataset.
+
+Labeling cost is controlled by --sf-time / --sf-nodes / --sf-depth. Depth-only
+search blows up on the messy positions a weak policy net reaches, so the default
+is a fixed ~100 ms per position (with --sf-depth acting as an early-exit ceiling).
+A few hundred ms of Stockfish is already far stronger than this network needs as
+a teacher, and it keeps wall-clock predictable.
 """
+
+import argparse
+import multiprocessing as mp
+import time
 
 import chess
 import chess.engine
-import torch
 import numpy as np
-from pathlib import Path
-from typing import List, Dict, Tuple
-import json
-from dataclasses import dataclass, asdict
-from tqdm import tqdm
-import multiprocessing as mp
+import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from chess_engine import ChessNet, fen_to_tensor, policy_index_to_move, get_legal_move_indices
+try:
+    from tqdm import tqdm
+except ImportError:  # tqdm is optional - fall back to a no-op wrapper
+    def tqdm(iterable=None, total=None, desc=None, **_kwargs):
+        return iterable if iterable is not None else range(total or 0)
+
+from chess_engine import ChessNet, fen_to_tensor, move_to_policy_index, ensure_parent_dir
+
+MATE_CP = 10000           # centipawn magnitude used to represent forced mates
+MATE_PAWNS_CLAMP = 100.0  # clamp the white-pov eval column to +/- this (pawns)
 
 
-@dataclass
-class TrainingExample:
-    """Single training example with FEN and targets"""
-    fen: str
-    policy_target: List[float]  # Length 4672 (73*64) - probability distribution
-    value_target: float  # -1 to +1
+# ---------------------------------------------------------------------------
+# Step 1: play games with the policy network
+# ---------------------------------------------------------------------------
 
+def _legal_move_logits(model, board, device):
+    """Return (legal_moves, logits_for_those_moves) using the policy head."""
+    with torch.no_grad():
+        board_tensor = fen_to_tensor(board.fen()).unsqueeze(0).to(device)
+        _value, policy_logits = model(board_tensor)        # (1, 73, 8, 8)
+        flat = policy_logits.reshape(-1).float().cpu().numpy()  # (4672,)
 
-def softmax_temperature(logits: np.ndarray, temperature: float = 1.0) -> np.ndarray:
-    """Apply temperature and softmax to logits"""
-    logits = logits / temperature
-    exp_logits = np.exp(logits - np.max(logits))
-    return exp_logits / exp_logits.sum()
-
-
-def sample_move_from_policy(board: chess.Board, policy_probs: np.ndarray, temperature: float = 0.8) -> chess.Move:
-    """
-    Sample a legal move from policy network probabilities.
-
-    Args:
-        board: Current board position
-        policy_probs: Policy network output (4672 probabilities)
-        temperature: Sampling temperature (higher = more random)
-
-    Returns:
-        Sampled chess move
-    """
     legal_moves = list(board.legal_moves)
-    legal_indices = get_legal_move_indices(board, legal_moves)
-
-    # Get probabilities for legal moves
-    legal_probs = np.array([policy_probs[idx] for idx in legal_indices])
-
-    # Apply temperature and renormalize
-    if temperature > 0:
-        legal_probs = softmax_temperature(np.log(legal_probs + 1e-10), temperature)
-
-    # Sample move
-    move_idx = np.random.choice(len(legal_moves), p=legal_probs)
-    return legal_moves[move_idx]
+    move_logits = np.full(len(legal_moves), -1e9, dtype=np.float64)
+    for i, mv in enumerate(legal_moves):
+        idx = move_to_policy_index(mv.uci())
+        if idx is not None:
+            src_row, src_col, plane = idx
+            move_logits[i] = flat[plane * 64 + src_row * 8 + src_col]
+    return legal_moves, move_logits
 
 
-def play_game_with_policy(model: ChessNet, device: torch.device, temperature: float = 0.8, max_moves: int = 200) -> List[str]:
+def _sample_move(model, board, device, temperature):
+    legal_moves, move_logits = _legal_move_logits(model, board, device)
+    temperature = max(float(temperature), 1e-3)
+    move_logits = move_logits / temperature
+    move_logits -= move_logits.max()
+    probs = np.exp(move_logits)
+    probs /= probs.sum()
+    return legal_moves[int(np.random.choice(len(legal_moves), p=probs))]
+
+
+def play_game_with_policy(model, device, temperature=0.8, max_moves=160):
     """
-    Play a single game using only the policy network.
+    Play one game with the policy network; return list of visited (non-terminal) FENs.
 
-    Args:
-        model: Neural network model
-        device: Device to run model on
-        temperature: Sampling temperature
-        max_moves: Maximum moves before declaring draw
-
-    Returns:
-        List of FEN strings for each position in the game
+    Ends on checkmate/stalemate, on a *claimable* draw (threefold repetition or the
+    50-move rule - a weak net shuffles into these constantly), or after `max_moves`
+    plies. Without the claimable-draw check, games routinely run to the ply cap with
+    ~100 near-identical shuffling positions that just waste Stockfish time.
     """
     board = chess.Board()
     positions = []
-
     model.eval()
-    with torch.no_grad():
-        while not board.is_game_over() and len(board.move_stack) < max_moves:
-            positions.append(board.fen())
-
-            # Get policy from network
-            board_tensor = fen_to_tensor(board.fen()).unsqueeze(0).to(device)
-            policy_logits, _ = model(board_tensor)
-            policy_probs = torch.softmax(policy_logits[0], dim=0).cpu().numpy()
-
-            # Sample move
-            move = sample_move_from_policy(board, policy_probs, temperature)
-            board.push(move)
-
+    while not board.is_game_over(claim_draw=True) and len(board.move_stack) < max_moves:
+        positions.append(board.fen())
+        board.push(_sample_move(model, board, device, temperature))
     return positions
 
 
-def get_stockfish_labels(fen: str, sf_path: str, depth: int = 20, multipv: int = 5) -> Tuple[List[Tuple[str, int]], int]:
+# ---------------------------------------------------------------------------
+# Parallel game generation (each worker process: one model, plays games)
+# ---------------------------------------------------------------------------
+
+_GEN_MODEL = None
+_GEN_DEVICE = None
+
+
+def _gen_worker_init(model_path: str, device: str):
+    global _GEN_MODEL, _GEN_DEVICE
+    torch.set_num_threads(1)
+    try:
+        dev = torch.device(device)
+        if dev.type == "cuda" and not torch.cuda.is_available():
+            dev = torch.device("cpu")
+    except Exception:  # noqa: BLE001
+        dev = torch.device("cpu")
+    _GEN_DEVICE = dev
+    model = ChessNet()
+    checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(_GEN_DEVICE)
+    model.eval()
+    _GEN_MODEL = model
+
+
+def _gen_worker_play(args):
+    _game_idx, temperature, max_moves = args
+    return play_game_with_policy(_GEN_MODEL, _GEN_DEVICE, temperature, max_moves)
+
+
+def _play_games_parallel(model_path, device, num_games, temperature, max_moves, num_workers):
+    """Play num_games across num_workers processes; return the flat list of visited FENs."""
+    n = max(1, min(int(num_workers), num_games))
+    # 'spawn' so each worker gets a clean CUDA context (the parent may already
+    # have CUDA initialized from a previous iteration's training - forking that
+    # would leave the child unable to put the model on the GPU).
+    try:
+        ctx = mp.get_context("spawn")
+    except ValueError:
+        ctx = None
+    print(f"  (playing {num_games} games across {n} worker process(es) on {device})", flush=True)
+    all_positions = []
+    report_every = max(1, num_games // 10)
+    with ProcessPoolExecutor(max_workers=n, mp_context=ctx,
+                             initializer=_gen_worker_init,
+                             initargs=(model_path, device)) as executor:
+        futures = [executor.submit(_gen_worker_play, (gi, temperature, max_moves))
+                   for gi in range(num_games)]
+        done = 0
+        for future in as_completed(futures):
+            all_positions.extend(future.result())
+            done += 1
+            if done % report_every == 0 or done == num_games:
+                print(f"  [play] {done}/{num_games} games done | {len(all_positions)} positions", flush=True)
+    return all_positions
+
+
+# ---------------------------------------------------------------------------
+# Step 2: label positions with Stockfish (runs in worker processes)
+# ---------------------------------------------------------------------------
+
+def _build_limit(sf_time=0.1, sf_depth=0, sf_nodes=0):
+    """Pick a chess.engine.Limit from the (time, depth, nodes) knobs."""
+    sf_time = float(sf_time or 0.0)
+    sf_depth = int(sf_depth or 0)
+    sf_nodes = int(sf_nodes or 0)
+    if sf_nodes > 0:
+        return chess.engine.Limit(nodes=sf_nodes)
+    if sf_time > 0:
+        # depth acts as an early-exit ceiling so easy positions don't burn the
+        # full time budget; on hard positions the time cap kicks in.
+        return chess.engine.Limit(time=sf_time, depth=sf_depth if sf_depth > 0 else None)
+    if sf_depth > 0:
+        return chess.engine.Limit(depth=sf_depth)
+    return chess.engine.Limit(time=0.1)
+
+
+def label_positions_batch(positions, sf_path, sf_time=0.1, sf_depth=0, sf_nodes=0,
+                          multipv=5, sf_hash=128):
     """
-    Get Stockfish labels for a position.
+    Label a batch of FENs with Stockfish using a single engine process.
 
-    Args:
-        fen: Position in FEN format
-        sf_path: Path to Stockfish binary
-        depth: Search depth
-        multipv: Number of principal variations
-
-    Returns:
-        (policy_moves, value) where:
-        - policy_moves: List of (move_uci, score_cp) tuples
-        - value: Position evaluation in centipawns
+    Returns a list of (fen, eval_pawns_white, [(uci, score_cp_stm), ...]).
     """
-    with chess.engine.SimpleEngine.popen_uci(sf_path) as engine:
-        board = chess.Board(fen)
+    rows = []
+    limit = _build_limit(sf_time, sf_depth, sf_nodes)
+    try:
+        engine = chess.engine.SimpleEngine.popen_uci(sf_path)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[label] could not start Stockfish: {exc}", flush=True)
+        return rows
 
-        # Get multi-PV analysis
-        info = engine.analyse(board, chess.engine.Limit(depth=depth), multipv=multipv)
-
-        policy_moves = []
-        for pv_info in info:
-            move = pv_info['pv'][0]
-            score = pv_info['score'].relative  # From side-to-move perspective (matches foundation data)
-
-            # Convert score to centipawns
-            if score.is_mate():
-                # Mate scores: cap at +/- 10000 cp
-                mate_in = score.mate()
-                score_cp = 10000 - abs(mate_in) if mate_in > 0 else -10000 + abs(mate_in)
-            else:
-                score_cp = score.score()
-
-            policy_moves.append((move.uci(), int(score_cp)))
-
-        # Value is the score of the best move (in centipawns, from side-to-move perspective)
-        value_cp = policy_moves[0][1] if policy_moves else 0
-
-        return policy_moves, int(value_cp)
-
-
-def centipawns_to_value(cp: float) -> float:
-    """
-    Convert centipawns to value in [-1, +1] range.
-    Uses tanh scaling: value = tanh(cp / 400)
-
-    This matches typical chess engine scaling where:
-    - 400 cp advantage ≈ 76% win probability
-    - 800 cp advantage ≈ 96% win probability
-    """
-    return np.tanh(cp / 400.0)
-
-
-def policy_moves_to_target(board: chess.Board, policy_moves: List[Tuple[str, float]]) -> np.ndarray:
-    """
-    Convert Stockfish multi-PV output to policy target distribution.
-
-    Strategy: Use softmax over move scores to create probability distribution.
-    Temperature tuned so top move gets ~40-60% probability.
-
-    Args:
-        board: Chess board position
-        policy_moves: List of (move_uci, score_cp) tuples from SF
-
-    Returns:
-        Policy target array of length 4672
-    """
-    policy_target = np.zeros(4672, dtype=np.float32)
-
-    if not policy_moves:
-        return policy_target
-
-    # Build move -> score mapping
-    move_scores = {}
-    for move_uci, score_cp in policy_moves:
+    try:
         try:
-            move = chess.Move.from_uci(move_uci)
-            if move in board.legal_moves:
-                move_scores[move] = score_cp
-        except:
-            continue
+            engine.configure({"Threads": 1, "Hash": int(sf_hash)})
+        except chess.engine.EngineError:
+            pass
 
-    if not move_scores:
-        return policy_target
+        for fen in positions:
+            try:
+                board = chess.Board(fen)
+            except ValueError:
+                continue
+            n_legal = board.legal_moves.count()
+            if n_legal == 0:
+                continue
+            try:
+                info = engine.analyse(board, limit, multipv=min(multipv, n_legal))
+            except chess.engine.EngineTerminatedError:
+                break  # engine died; salvage what we have
+            except chess.engine.EngineError:
+                continue
 
-    # Get all legal moves and their indices
-    legal_moves = list(board.legal_moves)
-    legal_indices = get_legal_move_indices(board, legal_moves)
+            if isinstance(info, dict):  # defensive: some versions return a dict for multipv=1
+                info = [info]
 
-    # Assign scores: SF moves get their scores, other legal moves get worst_score - 100
-    scores = []
-    worst_score = min(move_scores.values())
-    for move in legal_moves:
-        if move in move_scores:
-            scores.append(move_scores[move])
-        else:
-            scores.append(worst_score - 100)  # Penalize moves not in SF top-N
+            moves = []
+            for pv in info:
+                pv_line = pv.get("pv")
+                if not pv_line:
+                    continue
+                score_cp = pv["score"].relative.score(mate_score=MATE_CP)
+                if score_cp is None:
+                    continue
+                moves.append((pv_line[0].uci(), int(score_cp)))
+            if not moves:
+                continue
 
-    # Convert to probabilities with softmax (temperature = 100 cp)
-    # This makes ~100 cp difference = 2.7x probability ratio
-    scores = np.array(scores, dtype=np.float32)
-    probs = softmax_temperature(scores / 100.0, temperature=1.0)
+            white_cp = info[0]["score"].white().score(mate_score=MATE_CP)
+            if white_cp is None:
+                continue
+            eval_pawns = white_cp / 100.0
+            eval_pawns = max(-MATE_PAWNS_CLAMP, min(MATE_PAWNS_CLAMP, eval_pawns))
 
-    # Fill policy target
-    for move, idx, prob in zip(legal_moves, legal_indices, probs):
-        policy_target[idx] = prob
-
-    return policy_target
-
-
-@dataclass
-class SFLabel:
-    """Stockfish label for a position (raw format for CSV output)"""
-    fen: str
-    eval_cp: int  # Centipawns evaluation
-    moves: List[Tuple[str, int]]  # List of (move_uci, score_cp) tuples
-
-
-def label_position(fen: str, sf_path: str, depth: int = 20, multipv: int = 5) -> Tuple[TrainingExample, SFLabel]:
-    """
-    Label a single position with Stockfish.
-
-    Args:
-        fen: Position in FEN format
-        sf_path: Path to Stockfish binary
-        depth: Search depth
-        multipv: Number of principal variations
-
-    Returns:
-        Tuple of (TrainingExample, SFLabel) - neural targets and raw SF data
-    """
-    board = chess.Board(fen)
-
-    # Get Stockfish labels
-    policy_moves, value_cp = get_stockfish_labels(fen, sf_path, depth, multipv)
-
-    # Convert to neural network targets
-    policy_target = policy_moves_to_target(board, policy_moves)
-    value_target = centipawns_to_value(value_cp)
-
-    training_example = TrainingExample(
-        fen=fen,
-        policy_target=policy_target.tolist(),
-        value_target=value_target
-    )
-
-    sf_label = SFLabel(
-        fen=fen,
-        eval_cp=value_cp,
-        moves=policy_moves
-    )
-
-    return training_example, sf_label
-
-
-def label_positions_batch(positions: List[str], sf_path: str, depth: int = 20, multipv: int = 5) -> Tuple[List[TrainingExample], List[SFLabel]]:
-    """Label a batch of positions (for parallel processing)"""
-    examples = []
-    sf_labels = []
-    for fen in positions:
+            rows.append((fen, eval_pawns, moves))
+    finally:
         try:
-            example, sf_label = label_position(fen, sf_path, depth, multipv)
-            examples.append(example)
-            sf_labels.append(sf_label)
-        except Exception as e:
-            print(f"Error labeling position {fen}: {e}")
-            continue
-    return examples, sf_labels
+            engine.close()
+        except Exception:  # noqa: BLE001
+            pass
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Driver
+# ---------------------------------------------------------------------------
+
+def _describe_limit(sf_time, sf_depth, sf_nodes):
+    if sf_nodes and sf_nodes > 0:
+        return f"{sf_nodes} nodes/position"
+    if sf_time and sf_time > 0:
+        return f"{sf_time:g}s/position" + (f" (depth<={sf_depth} ceiling)" if sf_depth and sf_depth > 0 else "")
+    if sf_depth and sf_depth > 0:
+        return f"depth {sf_depth}/position"
+    return "0.1s/position"
 
 
 def generate_training_data(
@@ -280,119 +262,125 @@ def generate_training_data(
     temperature: float = 0.8,
     sf_depth: int = 20,
     sf_multipv: int = 5,
-    device: str = "mps"
+    sf_time: float = 0.1,
+    sf_nodes: int = 0,
+    sf_hash: int = 128,
+    max_moves: int = 160,
+    device: str = "cuda",
 ):
-    """
-    Generate training data with policy-only game play and Stockfish labeling.
+    limit_desc = _describe_limit(sf_time, sf_depth, sf_nodes)
+    print("Generating training data with Stockfish labeling...")
+    print(f"  Games: {num_games}  Temperature: {temperature}  Max plies/game: {max_moves}")
+    print(f"  SF budget: {limit_desc}  multi-PV: {sf_multipv}  Workers: {num_workers}  Hash: {sf_hash}MB/worker")
+    print(f"  Model: {model_path}")
+    print(f"  Output: {output_path}")
 
-    Args:
-        model_path: Path to neural network model checkpoint
-        output_path: Path to save training data (JSON lines format)
-        stockfish_path: Path to Stockfish binary
-        num_games: Number of games to generate
-        num_workers: Number of parallel workers for SF labeling
-        temperature: Sampling temperature for policy network
-        sf_depth: Stockfish search depth
-        sf_multipv: Number of principal variations from SF
-        device: Device to run neural network on
-    """
-    print(f"Generating training data with Stockfish labeling...")
-    print(f"  Games: {num_games}")
-    print(f"  Temperature: {temperature}")
-    print(f"  SF depth: {sf_depth}, multi-PV: {sf_multipv}")
-    print(f"  Workers: {num_workers}")
+    play_seconds = 0.0
+    label_seconds = 0.0
 
-    # Load model
-    device_torch = torch.device(device)
-    model = ChessNet()
-    checkpoint = torch.load(model_path, map_location=device_torch, weights_only=True)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device_torch)
-    model.eval()
+    # Step 1: play games
+    print("\nStep 1: playing games with the policy network...", flush=True)
+    t0 = time.time()
+    if num_workers and num_workers > 1 and num_games > 1:
+        # Parallel: worker processes load their own model; the parent stays
+        # CUDA-free here, which keeps the 'spawn' pool clean.
+        all_positions = _play_games_parallel(
+            model_path, device, num_games, temperature, max_moves, num_workers
+        )
+    else:
+        device_torch = torch.device(device)
+        model = ChessNet()
+        checkpoint = torch.load(model_path, map_location=device_torch, weights_only=False)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(device_torch)
+        model.eval()
+        all_positions = []
+        for _ in tqdm(range(num_games), desc="Playing games"):
+            all_positions.extend(play_game_with_policy(model, device_torch, temperature, max_moves))
 
-    # Step 1: Generate games using policy network
-    print("\nStep 1: Generating games with policy network...")
-    all_positions = []
+    # De-duplicate while preserving order (the start position appears in every game).
+    seen = set()
+    unique_positions = []
+    for fen in all_positions:
+        if fen not in seen:
+            seen.add(fen)
+            unique_positions.append(fen)
+    play_seconds = time.time() - t0
+    print(f"  Collected {len(all_positions)} positions ({len(unique_positions)} unique) from {num_games} games "
+          f"in {play_seconds:.1f}s", flush=True)
+    if num_games:
+        print(f"  Average plies per game: {len(all_positions) / num_games:.1f}", flush=True)
 
-    for game_idx in tqdm(range(num_games), desc="Playing games"):
-        positions = play_game_with_policy(model, device_torch, temperature)
-        all_positions.extend(positions)
+    # Step 2: label with Stockfish in parallel
+    print("\nStep 2: labeling positions with Stockfish...", flush=True)
+    n_chunks = max(1, num_workers * 4)
+    chunk_size = max(1, (len(unique_positions) + n_chunks - 1) // n_chunks)
+    batches = [unique_positions[i:i + chunk_size] for i in range(0, len(unique_positions), chunk_size)]
 
-    print(f"Generated {len(all_positions)} positions from {num_games} games")
-    print(f"Average positions per game: {len(all_positions) / num_games:.1f}")
+    rows = []
+    if batches:
+        t0 = time.time()
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = [
+                executor.submit(label_positions_batch, batch, stockfish_path,
+                                sf_time, sf_depth, sf_nodes, sf_multipv, sf_hash)
+                for batch in batches
+            ]
+            done = 0
+            for future in as_completed(futures):
+                rows.extend(future.result())
+                done += 1
+                elapsed = time.time() - t0
+                rate = len(rows) / elapsed if elapsed > 0 else 0.0
+                eta = (len(unique_positions) - len(rows)) / rate if rate > 0 else 0.0
+                print(f"  [label] {done}/{len(futures)} batches | {len(rows)}/{len(unique_positions)} positions "
+                      f"| {elapsed:.0f}s elapsed | ~{rate:.0f} pos/s | ETA ~{eta:.0f}s", flush=True)
+        label_seconds = time.time() - t0
+    print(f"Labeled {len(rows)} positions in {label_seconds:.1f}s")
 
-    # Step 2: Label positions with Stockfish in parallel
-    print("\nStep 2: Labeling positions with Stockfish...")
-
-    # Split positions into batches for parallel processing
-    batch_size = max(1, len(all_positions) // (num_workers * 4))
-    position_batches = [all_positions[i:i+batch_size] for i in range(0, len(all_positions), batch_size)]
-
-    all_examples = []
-    all_sf_labels = []
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = []
-        for batch in position_batches:
-            future = executor.submit(label_positions_batch, batch, stockfish_path, sf_depth, sf_multipv)
-            futures.append(future)
-
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Labeling positions"):
-            examples, sf_labels = future.result()
-            all_examples.extend(examples)
-            all_sf_labels.extend(sf_labels)
-
-    print(f"Successfully labeled {len(all_examples)} positions")
-
-    # Step 3: Save to CSV file (matching attempt_02 format)
-    print(f"\nStep 3: Saving to {output_path}...")
-
-    with open(output_path, 'w') as f:
-        # Write header
-        f.write('fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5\n')
-
-        # Write data
-        for sf_label in all_sf_labels:
-            # Convert eval to pawns
-            eval_pawns = sf_label.eval_cp / 100.0
-
-            # Build row
-            row = [sf_label.fen, f"{eval_pawns:.2f}"]
-
-            # Add up to 5 moves with scores
+    # Step 3: write CSV
+    print(f"\nStep 3: writing {output_path}...")
+    ensure_parent_dir(output_path)
+    with open(output_path, "w") as f:
+        f.write("fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5\n")
+        for fen, eval_pawns, moves in rows:
+            cells = [fen, f"{eval_pawns:.2f}"]
             for i in range(5):
-                if i < len(sf_label.moves):
-                    move_uci, score_cp = sf_label.moves[i]
-                    row.extend([move_uci, str(score_cp)])
+                if i < len(moves):
+                    cells.extend([moves[i][0], str(moves[i][1])])
                 else:
-                    row.extend(['', ''])
+                    cells.extend(["", ""])
+            f.write(",".join(cells) + "\n")
+    print(f"Saved {len(rows)} training examples to {output_path}")
 
-            f.write(','.join(row) + '\n')
+    if rows:
+        evals = np.array([r[1] for r in rows], dtype=np.float32)
+        print("\nEval column (white pov, pawns):")
+        print(f"  mean {evals.mean():.2f}  std {evals.std():.2f}  min {evals.min():.2f}  max {evals.max():.2f}")
 
-    print(f"✓ Saved {len(all_sf_labels)} training examples to {output_path}")
-
-    # Print statistics
-    values = [ex.value_target for ex in all_examples]
-    print(f"\nValue statistics:")
-    print(f"  Mean: {np.mean(values):.3f}")
-    print(f"  Std:  {np.std(values):.3f}")
-    print(f"  Min:  {np.min(values):.3f}")
-    print(f"  Max:  {np.max(values):.3f}")
+    return {
+        "positions": len(rows),
+        "games": num_games,
+        "play_seconds": play_seconds,
+        "label_seconds": label_seconds,
+    }
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Generate training data with Stockfish labeling")
     parser.add_argument("--model", type=str, required=True, help="Path to model checkpoint")
-    parser.add_argument("--output", type=str, required=True, help="Output path for training data")
+    parser.add_argument("--output", type=str, required=True, help="Output path for training data (CSV)")
     parser.add_argument("--stockfish", type=str, required=True, help="Path to Stockfish binary")
     parser.add_argument("--games", type=int, default=100, help="Number of games to generate")
-    parser.add_argument("--workers", type=int, default=8, help="Number of parallel workers")
-    parser.add_argument("--temperature", type=float, default=0.8, help="Sampling temperature")
-    parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish search depth")
+    parser.add_argument("--workers", type=int, default=8, help="Number of parallel labeling workers (Stockfish is 1 thread each)")
+    parser.add_argument("--temperature", type=float, default=0.8, help="Policy sampling temperature")
+    parser.add_argument("--sf-time", type=float, default=0.1, help="Seconds of Stockfish per position (0 to disable; default 0.1)")
+    parser.add_argument("--sf-nodes", type=int, default=0, help="Stockfish nodes per position (overrides --sf-time/--sf-depth if >0)")
+    parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish depth: a search ceiling when --sf-time>0, or the budget when --sf-time=0")
     parser.add_argument("--sf-multipv", type=int, default=5, help="Stockfish multi-PV count")
-    parser.add_argument("--device", type=str, default="mps", help="Device (cpu/cuda/mps)")
-
+    parser.add_argument("--sf-hash", type=int, default=128, help="Hash (MB) per Stockfish worker")
+    parser.add_argument("--max-moves", type=int, default=160, help="Max plies per game before cutting it short")
+    parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda/mps)")
     args = parser.parse_args()
 
     generate_training_data(
@@ -404,5 +392,9 @@ if __name__ == "__main__":
         temperature=args.temperature,
         sf_depth=args.sf_depth,
         sf_multipv=args.sf_multipv,
-        device=args.device
+        sf_time=args.sf_time,
+        sf_nodes=args.sf_nodes,
+        sf_hash=args.sf_hash,
+        max_moves=args.max_moves,
+        device=args.device,
     )

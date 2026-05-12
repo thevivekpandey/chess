@@ -37,10 +37,14 @@ def run_pipeline(
     learning_rate: float = 0.001,
     sf_depth: int = 20,
     sf_multipv: int = 5,
+    sf_time: float = 0.1,
+    sf_nodes: int = 0,
+    sf_hash: int = 128,
+    gen_max_moves: int = 160,
     eval_games: int = 100,
     initial_sf_level: int = 0,
     num_workers: int = 8,
-    device: str = "mps"
+    device: str = "cuda"
 ):
     """
     Run the full supervised learning pipeline with adaptive Stockfish difficulty.
@@ -81,7 +85,12 @@ def run_pipeline(
     print(f"Iterations: {num_iterations}")
     print(f"Games/iteration: {games_per_iteration}")
     print(f"Training epochs: {training_epochs}")
-    print(f"SF depth: {sf_depth}, multi-PV: {sf_multipv}")
+    if sf_nodes and sf_nodes > 0:
+        print(f"SF labeling budget: {sf_nodes} nodes/position, multi-PV: {sf_multipv}")
+    elif sf_time and sf_time > 0:
+        print(f"SF labeling budget: {sf_time:g}s/position (depth<={sf_depth} ceiling), multi-PV: {sf_multipv}")
+    else:
+        print(f"SF labeling budget: depth {sf_depth}/position, multi-PV: {sf_multipv}")
     print(f"Eval games: {eval_games}")
     print(f"Starting SF level: {initial_sf_level} (auto-advances when >60%)")
     print()
@@ -108,24 +117,85 @@ def run_pipeline(
     # Adaptive difficulty tracking
     current_sf_level = initial_sf_level
     baseline_score = None  # Will be set in first iteration at each level
+    level_start_iteration = 1  # Iteration on which the current SF level began
     level_history = []  # Track level progressions
 
     # Log results
     results_log = []
 
+    log_path = os.path.join(logs_dir, "training_log.json")
+
+    def _save_log():
+        with open(log_path, 'w') as f:
+            json.dump(results_log, f, indent=2)
+
+    def _timing_line(iteration, timings, iter_time, suffix=""):
+        eval_total = timings.get('baseline_eval', 0.0) + timings.get('candidate_eval', 0.0)
+        return (
+            f"⏱  Iteration {iteration}: "
+            f"play {timings.get('play', 0.0):.0f}s · label {timings.get('label', 0.0):.0f}s · "
+            f"mix {timings.get('mix', 0.0):.0f}s · train {timings.get('train', 0.0):.0f}s · "
+            f"eval {eval_total:.0f}s · total {iter_time:.0f}s ({iter_time/60:.1f} min){suffix}"
+        )
+
     # Training loop
     for iteration in range(1, num_iterations + 1):
         print("\n" + "=" * 80)
-        print(f"ITERATION {iteration}/{num_iterations}")
+        print(f"ITERATION {iteration}/{num_iterations}  (Stockfish level {current_sf_level})")
         print("=" * 80)
 
         iter_start_time = time.time()
+        timings = {}
+
+        # Establish the baseline for this level BEFORE doing any work, so a level the
+        # current best model already clears (>60%) is skipped without wasting a full
+        # generate/label/train cycle.
+        if baseline_score is None:
+            print(f"\n[Level {current_sf_level}] Establishing baseline: best model vs Stockfish L{current_sf_level} ...")
+            t = time.time()
+            baseline_stats = evaluate_model(
+                model_path=best_model_path,
+                stockfish_path=stockfish_path,
+                num_games=eval_games,
+                stockfish_level=current_sf_level,
+                stockfish_time=0.1,
+                device=device,
+                num_workers=num_workers
+            )
+            timings['baseline_eval'] = time.time() - t
+            baseline_score = baseline_stats['score']
+            print(f"  Baseline: {baseline_score:.3f} ({baseline_score:.1%})  [eval took {timings['baseline_eval']:.0f}s]")
+
+            if baseline_score > 0.60:
+                iter_time = time.time() - iter_start_time
+                print(f"  🚀 Best model already exceeds 60% at level {current_sf_level} — "
+                      f"advancing to level {current_sf_level + 1} without training.")
+                print(_timing_line(iteration, timings, iter_time, suffix=f"  [level {current_sf_level} skipped]"))
+                level_history.append({
+                    'level': current_sf_level,
+                    'final_score': baseline_score,
+                    'iterations': 0,
+                    'skipped': True
+                })
+                results_log.append({
+                    'iteration': iteration,
+                    'sf_level': current_sf_level,
+                    'skipped': True,
+                    'baseline_score': baseline_score,
+                    'timings': {k: round(v, 1) for k, v in timings.items()},
+                    'time_seconds': iter_time
+                })
+                _save_log()
+                current_sf_level += 1
+                baseline_score = None
+                level_start_iteration = iteration + 1
+                continue
 
         # Step 1: Generate training data
         print(f"\n[Step 1/4] Generating training data...")
         raw_data_path = os.path.join(data_dir, f"iter{iteration}_raw.csv")
 
-        generate_training_data(
+        gen_info = generate_training_data(
             model_path=current_model_path,
             output_path=raw_data_path,
             stockfish_path=stockfish_path,
@@ -134,13 +204,20 @@ def run_pipeline(
             temperature=0.8,
             sf_depth=sf_depth,
             sf_multipv=sf_multipv,
+            sf_time=sf_time,
+            sf_nodes=sf_nodes,
+            sf_hash=sf_hash,
+            max_moves=gen_max_moves,
             device=device
-        )
+        ) or {}
+        timings['play'] = gen_info.get('play_seconds', 0.0)
+        timings['label'] = gen_info.get('label_seconds', 0.0)
 
         # Step 2: Mix with foundation data (if provided)
         train_data_path = os.path.join(data_dir, f"iter{iteration}_train.csv")
         val_data_path = os.path.join(data_dir, f"iter{iteration}_val.csv")
 
+        t = time.time()
         if foundation_data_path:
             print(f"\n[Step 2/4] Mixing with foundation data ({foundation_ratio:.0%} foundation)...")
             mix_datasets(
@@ -172,11 +249,13 @@ def run_pipeline(
 
             print(f"  Train: {split_idx} examples")
             print(f"  Val: {len(rows) - split_idx} examples")
+        timings['mix'] = time.time() - t
 
         # Step 3: Train model
         print(f"\n[Step 3/4] Training model...")
         iter_models_dir = os.path.join(models_dir, f"iter{iteration}")
 
+        t = time.time()
         train_supervised(
             train_data_path=train_data_path,
             val_data_path=val_data_path,
@@ -190,6 +269,7 @@ def run_pipeline(
             device=device,
             save_every=training_epochs  # Only save final
         )
+        timings['train'] = time.time() - t
 
         # Update current model to latest trained
         new_model_path = os.path.join(iter_models_dir, f"model_epoch_{training_epochs}.pth")
@@ -197,46 +277,18 @@ def run_pipeline(
         shutil.copy(new_model_path, candidate_model_path)
 
         # Step 4: Evaluate candidate model at current SF level
-        print(f"\n[Step 4/4] Evaluating model vs Stockfish level {current_sf_level}...")
-
-        # If baseline not set (first iteration or level just increased), establish it
-        if baseline_score is None:
-            print(f"  Establishing baseline at level {current_sf_level}...")
-            baseline_stats = evaluate_model(
-                model_path=best_model_path,  # Current best
-                stockfish_path=stockfish_path,
-                num_games=eval_games,
-                stockfish_level=current_sf_level,
-                stockfish_time=0.1,
-                device=device
-            )
-            baseline_score = baseline_stats['score']
-            print(f"  Baseline score: {baseline_score:.3f} ({baseline_score:.1%})")
-
-            # Check if already > 60% (skip training, advance level immediately)
-            if baseline_score > 0.60:
-                print(f"\n  🚀 Baseline already exceeds 60%! Skipping training, advancing to level {current_sf_level + 1}")
-                level_history.append({
-                    'level': current_sf_level,
-                    'final_score': baseline_score,
-                    'iterations': 0,
-                    'skipped': True
-                })
-                current_sf_level += 1
-                baseline_score = None  # Reset for next level
-                continue  # Skip to next iteration
-            print()
-
-        # Evaluate candidate
-        print(f"  Evaluating candidate (M{iteration})...")
+        print(f"\n[Step 4/4] Evaluating candidate (M{iteration}) vs Stockfish level {current_sf_level}...")
+        t = time.time()
         eval_stats = evaluate_model(
             model_path=candidate_model_path,
             stockfish_path=stockfish_path,
             num_games=eval_games,
             stockfish_level=current_sf_level,
             stockfish_time=0.1,
-            device=device
+            device=device,
+            num_workers=num_workers
         )
+        timings['candidate_eval'] = time.time() - t
         candidate_score = eval_stats['score']
 
         # Promotion decision
@@ -249,6 +301,7 @@ def run_pipeline(
 
         promoted = False
         level_advanced = False
+        sf_level_for_log = current_sf_level
 
         if candidate_score > baseline_score:
             print(f"\n✓ PROMOTED! Candidate beats baseline.")
@@ -263,16 +316,19 @@ def run_pipeline(
 
             # Check if exceeds 60% - advance to next level
             if baseline_score > 0.60:
-                print(f"\n🎯 Baseline exceeds 60%! Advancing to Stockfish level {current_sf_level + 1}")
+                iters_at_level = iteration - level_start_iteration + 1
+                print(f"\n🎯 Baseline exceeds 60%! Advancing to Stockfish level {current_sf_level + 1} "
+                      f"(took {iters_at_level} iteration(s) at level {current_sf_level})")
                 level_history.append({
                     'level': current_sf_level,
                     'final_score': baseline_score,
-                    'iterations': iteration if iteration == 1 else len([r for r in results_log if r.get('sf_level') == current_sf_level]),
+                    'iterations': iters_at_level,
                     'skipped': False
                 })
                 current_sf_level += 1
                 baseline_score = None  # Reset baseline for new level
                 level_advanced = True
+                level_start_iteration = iteration + 1
         else:
             print(f"\n✗ REJECTED. Candidate does not beat baseline.")
             print(f"  Training trunk reset to best model (discarding M{iteration})")
@@ -282,10 +338,11 @@ def run_pipeline(
 
         # Log results
         iter_time = time.time() - iter_start_time
+        print("\n" + _timing_line(iteration, timings, iter_time))
         result = {
             'iteration': iteration,
             'model': f"M{iteration}",
-            'sf_level': current_sf_level if not level_advanced else current_sf_level - 1,
+            'sf_level': sf_level_for_log,
             'candidate_score': candidate_score,
             'baseline_score': baseline_score if baseline_score is not None else candidate_score,
             'improvement': candidate_score - (baseline_score if baseline_score is not None else candidate_score),
@@ -294,16 +351,11 @@ def run_pipeline(
             'losses': eval_stats['losses'],
             'promoted': promoted,
             'level_advanced': level_advanced,
+            'timings': {k: round(v, 1) for k, v in timings.items()},
             'time_seconds': iter_time
         }
         results_log.append(result)
-
-        # Save results log
-        log_path = os.path.join(logs_dir, "training_log.json")
-        with open(log_path, 'w') as f:
-            json.dump(results_log, f, indent=2)
-
-        print(f"\n✓ Iteration {iteration} complete in {iter_time/60:.1f} minutes")
+        _save_log()
 
     # Final summary
     print("\n" + "=" * 80)
@@ -324,6 +376,11 @@ def run_pipeline(
     print(f"{'Iter':<6} {'Model':<8} {'Level':<6} {'Score':<8} {'Baseline':<10} {'Δ':<8} {'W':<4} {'D':<4} {'L':<4} {'Status':<15}")
     print("-" * 90)
     for result in results_log:
+        if result.get('skipped'):
+            print(f"{result['iteration']:<6} {'-':<8} {result['sf_level']:<6} {'-':<8} "
+                  f"{result.get('baseline_score', 0.0):<10.3f} {'-':<8} {'-':<4} {'-':<4} {'-':<4} "
+                  f"{'⏭ SKIPPED (>60%)':<15}")
+            continue
         status = "✓ PROMOTED" if result['promoted'] else "✗ REJECTED"
         if result.get('level_advanced'):
             status += " [LVL+]"
@@ -359,12 +416,16 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs per iteration")
     parser.add_argument("--batch-size", type=int, default=256, help="Training batch size")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish depth for labeling")
+    parser.add_argument("--sf-time", type=float, default=0.1, help="Seconds of Stockfish per labeled position (0 disables; default 0.1)")
+    parser.add_argument("--sf-nodes", type=int, default=0, help="Stockfish nodes per labeled position (overrides --sf-time/--sf-depth if >0)")
+    parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish depth: a search ceiling when --sf-time>0, or the budget when --sf-time=0")
     parser.add_argument("--sf-multipv", type=int, default=5, help="Stockfish multi-PV count")
+    parser.add_argument("--sf-hash", type=int, default=128, help="Hash (MB) per Stockfish labeling worker")
+    parser.add_argument("--gen-max-moves", type=int, default=160, help="Max plies per generated game")
     parser.add_argument("--eval-games", type=int, default=100, help="Evaluation games")
     parser.add_argument("--initial-level", type=int, default=0, help="Starting Stockfish level (default: 0, auto-advances)")
-    parser.add_argument("--workers", type=int, default=8, help="Number of workers")
-    parser.add_argument("--device", type=str, default="mps", help="Device (cpu/cuda/mps)")
+    parser.add_argument("--workers", type=int, default=8, help="Parallel Stockfish labeling workers (1 thread each)")
+    parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda/mps)")
 
     args = parser.parse_args()
 
@@ -381,6 +442,10 @@ if __name__ == "__main__":
         learning_rate=args.lr,
         sf_depth=args.sf_depth,
         sf_multipv=args.sf_multipv,
+        sf_time=args.sf_time,
+        sf_nodes=args.sf_nodes,
+        sf_hash=args.sf_hash,
+        gen_max_moves=args.gen_max_moves,
         eval_games=args.eval_games,
         initial_sf_level=args.initial_level,
         num_workers=args.workers,
