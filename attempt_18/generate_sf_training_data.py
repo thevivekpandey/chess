@@ -124,19 +124,19 @@ def get_stockfish_labels(fen: str, sf_path: str, depth: int = 20, multipv: int =
         policy_moves = []
         for pv_info in info:
             move = pv_info['pv'][0]
-            score = pv_info['score'].white()
+            score = pv_info['score'].relative  # From side-to-move perspective (matches foundation data)
 
             # Convert score to centipawns
             if score.is_mate():
                 # Mate scores: cap at +/- 10000 cp
                 mate_in = score.mate()
-                score_cp = 10000 if mate_in > 0 else -10000
+                score_cp = 10000 - abs(mate_in) if mate_in > 0 else -10000 + abs(mate_in)
             else:
                 score_cp = score.score()
 
             policy_moves.append((move.uci(), int(score_cp)))
 
-        # Value is the score of the best move (in centipawns, from white's perspective)
+        # Value is the score of the best move (in centipawns, from side-to-move perspective)
         value_cp = policy_moves[0][1] if policy_moves else 0
 
         return policy_moves, int(value_cp)
