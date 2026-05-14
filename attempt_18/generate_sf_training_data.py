@@ -25,14 +25,47 @@ a teacher, and it keeps wall-clock predictable.
 """
 
 import argparse
+import gc
 import multiprocessing as mp
+import os
 import time
 
 import chess
 import chess.engine
+import chess.pgn
 import numpy as np
 import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+
+def _terminate_pool(executor):
+    """Force-kill any worker processes that didn't exit cleanly after shutdown.
+
+    PyTorch's CUDA-context finalize in a spawn worker can stall, so a worker
+    that has received the executor's sentinel may keep its Python process (and
+    its GPU memory mapping) alive long after `shutdown(wait=True)` returns.
+    Capture the worker handles BEFORE shutdown (it nulls `_processes`), then
+    explicitly terminate any survivor."""
+    procs_dict = getattr(executor, "_processes", None) or {}
+    procs = list(procs_dict.values())
+    executor.shutdown(wait=True)
+    for p in procs:
+        if not p.is_alive():
+            continue
+        try:
+            p.terminate()
+            p.join(timeout=2.0)
+        except Exception:  # noqa: BLE001
+            pass
+        if p.is_alive():
+            try:
+                p.kill()
+                p.join(timeout=1.0)
+            except Exception:  # noqa: BLE001
+                pass
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 try:
     from tqdm import tqdm
@@ -40,46 +73,28 @@ except ImportError:  # tqdm is optional - fall back to a no-op wrapper
     def tqdm(iterable=None, total=None, desc=None, **_kwargs):
         return iterable if iterable is not None else range(total or 0)
 
-from chess_engine import ChessNet, fen_to_tensor, move_to_policy_index, ensure_parent_dir
+from chess_engine import ChessNet, ensure_parent_dir
+from move_search import choose_move
 
 MATE_CP = 10000           # centipawn magnitude used to represent forced mates
 MATE_PAWNS_CLAMP = 100.0  # clamp the white-pov eval column to +/- this (pawns)
 
 
 # ---------------------------------------------------------------------------
-# Step 1: play games with the policy network
+# Step 1: play games with the network
 # ---------------------------------------------------------------------------
 
-def _legal_move_logits(model, board, device):
-    """Return (legal_moves, logits_for_those_moves) using the policy head."""
-    with torch.no_grad():
-        board_tensor = fen_to_tensor(board.fen()).unsqueeze(0).to(device)
-        _value, policy_logits = model(board_tensor)        # (1, 73, 8, 8)
-        flat = policy_logits.reshape(-1).float().cpu().numpy()  # (4672,)
-
-    legal_moves = list(board.legal_moves)
-    move_logits = np.full(len(legal_moves), -1e9, dtype=np.float64)
-    for i, mv in enumerate(legal_moves):
-        idx = move_to_policy_index(mv.uci())
-        if idx is not None:
-            src_row, src_col, plane = idx
-            move_logits[i] = flat[plane * 64 + src_row * 8 + src_col]
-    return legal_moves, move_logits
-
-
-def _sample_move(model, board, device, temperature):
-    legal_moves, move_logits = _legal_move_logits(model, board, device)
-    temperature = max(float(temperature), 1e-3)
-    move_logits = move_logits / temperature
-    move_logits -= move_logits.max()
-    probs = np.exp(move_logits)
-    probs /= probs.sum()
-    return legal_moves[int(np.random.choice(len(legal_moves), p=probs))]
-
-
-def play_game_with_policy(model, device, temperature=0.8, max_moves=160):
+def play_game_with_policy(model, device, temperature=0.8, max_moves=160, search_depth=1):
     """
-    Play one game with the policy network; return list of visited (non-terminal) FENs.
+    Play one self-play game with the network.
+
+    Move selection goes through move_search.choose_move: `search_depth` plies of
+    value-head negamax (search_depth=1 = pick the move whose resulting position the
+    value head likes best), or the raw policy head when search_depth<=0.
+
+    Returns ``(positions, game_record)`` where ``positions`` is the list of visited
+    (non-terminal) FENs and ``game_record`` is ``{"moves": [uci, ...], "result": str,
+    "plies": int}`` describing the actual self-play game (so it can be written to PGN).
 
     Ends on checkmate/stalemate, on a *claimable* draw (threefold repetition or the
     50-move rule - a weak net shuffles into these constantly), or after `max_moves`
@@ -91,8 +106,43 @@ def play_game_with_policy(model, device, temperature=0.8, max_moves=160):
     model.eval()
     while not board.is_game_over(claim_draw=True) and len(board.move_stack) < max_moves:
         positions.append(board.fen())
-        board.push(_sample_move(model, board, device, temperature))
-    return positions
+        board.push(choose_move(model, board, device, search_depth, temperature))
+    result = board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
+    moves_uci = [mv.uci() for mv in board.move_stack]
+    return positions, {"moves": moves_uci, "result": result, "plies": len(moves_uci)}
+
+
+def _write_games_pgn(games, path, model_label="", temperature=None):
+    """Write self-play `games` (the dicts returned by play_game_with_policy) to a PGN file."""
+    if not games:
+        return 0
+    ensure_parent_dir(path)
+    written = 0
+    with open(path, "w") as f:
+        for i, g in enumerate(games, 1):
+            game = chess.pgn.Game()
+            game.headers["Event"] = "policy-net self-play"
+            game.headers["Site"] = "attempt_18"
+            game.headers["Round"] = str(i)
+            game.headers["White"] = model_label or "ChessNet"
+            game.headers["Black"] = model_label or "ChessNet"
+            game.headers["Result"] = g.get("result", "*")
+            if temperature is not None:
+                game.headers["Temperature"] = f"{temperature:g}"
+            node = game
+            ok = True
+            for uci in g.get("moves", []):
+                try:
+                    node = node.add_variation(chess.Move.from_uci(uci))
+                except ValueError:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            game.headers["PlyCount"] = str(g.get("plies", len(g.get("moves", []))))
+            print(game, file=f, end="\n\n")
+            written += 1
+    return written
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +172,12 @@ def _gen_worker_init(model_path: str, device: str):
 
 
 def _gen_worker_play(args):
-    _game_idx, temperature, max_moves = args
-    return play_game_with_policy(_GEN_MODEL, _GEN_DEVICE, temperature, max_moves)
+    _game_idx, temperature, max_moves, search_depth = args
+    return play_game_with_policy(_GEN_MODEL, _GEN_DEVICE, temperature, max_moves, search_depth)
 
 
-def _play_games_parallel(model_path, device, num_games, temperature, max_moves, num_workers):
-    """Play num_games across num_workers processes; return the flat list of visited FENs."""
+def _play_games_parallel(model_path, device, num_games, temperature, max_moves, num_workers, search_depth):
+    """Play num_games across num_workers processes; return (flat list of visited FENs, list of game records)."""
     n = max(1, min(int(num_workers), num_games))
     # 'spawn' so each worker gets a clean CUDA context (the parent may already
     # have CUDA initialized from a previous iteration's training - forking that
@@ -138,19 +188,25 @@ def _play_games_parallel(model_path, device, num_games, temperature, max_moves, 
         ctx = None
     print(f"  (playing {num_games} games across {n} worker process(es) on {device})", flush=True)
     all_positions = []
+    games = []
     report_every = max(1, num_games // 10)
-    with ProcessPoolExecutor(max_workers=n, mp_context=ctx,
-                             initializer=_gen_worker_init,
-                             initargs=(model_path, device)) as executor:
-        futures = [executor.submit(_gen_worker_play, (gi, temperature, max_moves))
+    executor = ProcessPoolExecutor(max_workers=n, mp_context=ctx,
+                                   initializer=_gen_worker_init,
+                                   initargs=(model_path, device))
+    try:
+        futures = [executor.submit(_gen_worker_play, (gi, temperature, max_moves, search_depth))
                    for gi in range(num_games)]
         done = 0
         for future in as_completed(futures):
-            all_positions.extend(future.result())
+            positions, game_rec = future.result()
+            all_positions.extend(positions)
+            games.append(game_rec)
             done += 1
             if done % report_every == 0 or done == num_games:
                 print(f"  [play] {done}/{num_games} games done | {len(all_positions)} positions", flush=True)
-    return all_positions
+    finally:
+        _terminate_pool(executor)
+    return all_positions, games
 
 
 # ---------------------------------------------------------------------------
@@ -267,25 +323,32 @@ def generate_training_data(
     sf_hash: int = 128,
     max_moves: int = 160,
     device: str = "cuda",
+    save_games_path: str = None,
+    search_depth: int = 1,
 ):
     limit_desc = _describe_limit(sf_time, sf_depth, sf_nodes)
+    move_desc = (f"{search_depth}-ply value search" if search_depth and search_depth >= 1
+                 else "policy head only")
     print("Generating training data with Stockfish labeling...")
-    print(f"  Games: {num_games}  Temperature: {temperature}  Max plies/game: {max_moves}")
+    print(f"  Games: {num_games}  Move selection: {move_desc}  Temperature: {temperature}  Max plies/game: {max_moves}")
     print(f"  SF budget: {limit_desc}  multi-PV: {sf_multipv}  Workers: {num_workers}  Hash: {sf_hash}MB/worker")
     print(f"  Model: {model_path}")
     print(f"  Output: {output_path}")
+    if save_games_path:
+        print(f"  Self-play PGN: {save_games_path}")
 
     play_seconds = 0.0
     label_seconds = 0.0
+    games = []
 
     # Step 1: play games
-    print("\nStep 1: playing games with the policy network...", flush=True)
+    print(f"\nStep 1: playing games ({move_desc})...", flush=True)
     t0 = time.time()
     if num_workers and num_workers > 1 and num_games > 1:
         # Parallel: worker processes load their own model; the parent stays
         # CUDA-free here, which keeps the 'spawn' pool clean.
-        all_positions = _play_games_parallel(
-            model_path, device, num_games, temperature, max_moves, num_workers
+        all_positions, games = _play_games_parallel(
+            model_path, device, num_games, temperature, max_moves, num_workers, search_depth
         )
     else:
         device_torch = torch.device(device)
@@ -296,7 +359,9 @@ def generate_training_data(
         model.eval()
         all_positions = []
         for _ in tqdm(range(num_games), desc="Playing games"):
-            all_positions.extend(play_game_with_policy(model, device_torch, temperature, max_moves))
+            positions, game_rec = play_game_with_policy(model, device_torch, temperature, max_moves, search_depth)
+            all_positions.extend(positions)
+            games.append(game_rec)
 
     # De-duplicate while preserving order (the start position appears in every game).
     seen = set()
@@ -311,6 +376,13 @@ def generate_training_data(
     if num_games:
         print(f"  Average plies per game: {len(all_positions) / num_games:.1f}", flush=True)
 
+    # Save the self-play games as PGN (the actual move sequences + results).
+    games_written = 0
+    if save_games_path and games:
+        model_label = os.path.splitext(os.path.basename(model_path))[0] if model_path else "ChessNet"
+        games_written = _write_games_pgn(games, save_games_path, model_label=model_label, temperature=temperature)
+        print(f"  Saved {games_written} self-play games to {save_games_path}", flush=True)
+
     # Step 2: label with Stockfish in parallel
     print("\nStep 2: labeling positions with Stockfish...", flush=True)
     n_chunks = max(1, num_workers * 4)
@@ -320,7 +392,15 @@ def generate_training_data(
     rows = []
     if batches:
         t0 = time.time()
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        # 'spawn' so label workers don't inherit the parent's mmap'd CUDA libs
+        # (forked labelers showed up in nvidia-smi holding ~900 MB each once the
+        # parent had touched CUDA in an earlier iteration's training phase).
+        try:
+            label_ctx = mp.get_context("spawn")
+        except ValueError:
+            label_ctx = None
+        executor = ProcessPoolExecutor(max_workers=num_workers, mp_context=label_ctx)
+        try:
             futures = [
                 executor.submit(label_positions_batch, batch, stockfish_path,
                                 sf_time, sf_depth, sf_nodes, sf_multipv, sf_hash)
@@ -335,6 +415,8 @@ def generate_training_data(
                 eta = (len(unique_positions) - len(rows)) / rate if rate > 0 else 0.0
                 print(f"  [label] {done}/{len(futures)} batches | {len(rows)}/{len(unique_positions)} positions "
                       f"| {elapsed:.0f}s elapsed | ~{rate:.0f} pos/s | ETA ~{eta:.0f}s", flush=True)
+        finally:
+            _terminate_pool(executor)
         label_seconds = time.time() - t0
     print(f"Labeled {len(rows)} positions in {label_seconds:.1f}s")
 
@@ -361,6 +443,8 @@ def generate_training_data(
     return {
         "positions": len(rows),
         "games": num_games,
+        "games_written": games_written,
+        "games_pgn": save_games_path if games_written else None,
         "play_seconds": play_seconds,
         "label_seconds": label_seconds,
     }
@@ -380,6 +464,10 @@ if __name__ == "__main__":
     parser.add_argument("--sf-multipv", type=int, default=5, help="Stockfish multi-PV count")
     parser.add_argument("--sf-hash", type=int, default=128, help="Hash (MB) per Stockfish worker")
     parser.add_argument("--max-moves", type=int, default=160, help="Max plies per game before cutting it short")
+    parser.add_argument("--search-depth", type=int, default=1,
+                        help="Plies of value-head negamax for move selection during self-play "
+                             "(1 = pick the move whose resulting position the value head likes best; 0 = policy head only)")
+    parser.add_argument("--save-games", type=str, default=None, help="If set, write the self-play games to this PGN file")
     parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda/mps)")
     args = parser.parse_args()
 
@@ -397,4 +485,6 @@ if __name__ == "__main__":
         sf_hash=args.sf_hash,
         max_moves=args.max_moves,
         device=args.device,
+        save_games_path=args.save_games,
+        search_depth=args.search_depth,
     )

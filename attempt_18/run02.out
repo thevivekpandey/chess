@@ -1,0 +1,75 @@
+================================================================================
+SUPERVISED LEARNING PIPELINE WITH STOCKFISH
+================================================================================
+Base directory: runs/run_02
+Initial model: ../attempt_17/m0.pt
+Stockfish: /usr/games/stockfish
+Foundation data: ../attempt_02/training_data_augmented.csv
+Foundation ratio: 0.3
+Iterations: 50
+Games/iteration: 1000
+Training epochs: 3  policy_weight: 0.1
+Move selection (self-play & eval): 2-ply value search
+SF labeling budget: 0.1s/position (depth<=20 ceiling), multi-PV: 5
+Eval games: 100
+Starting SF level: 1 (auto-advances when >60%)
+
+✓ Copied initial model to runs/run_02/models/model_M0.pth
+
+================================================================================
+ITERATION 1/50  (Stockfish level 1)
+================================================================================
+
+[Level 1] Establishing baseline: best model vs Stockfish L1 ...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_02/models/model_best.pth
+Stockfish level: 1  time: 0.1s/move  games: 100  move selection: 2-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/concurrent/futures/process.py", line 246, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 122, in _eval_worker_play
+    result = play_game_vs_stockfish(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 63, in play_game_vs_stockfish
+    move = choose_move(model, board, device, search_depth, model_temperature)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 170, in choose_move
+    mv = _search_move(model, board, device, int(search_depth), temperature)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 160, in _search_move
+    return _sample_or_argmax(moves, scores, temperature)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 64, in _sample_or_argmax
+    return items[int(np.argmax(scores))]
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/numpy/_core/fromnumeric.py", line 1342, in argmax
+    return _wrapfunc(a, 'argmax', axis=axis, out=out, **kwds)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/numpy/_core/fromnumeric.py", line 57, in _wrapfunc
+    return bound(*args, **kwds)
+ValueError: attempt to get argmax of an empty sequence
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/chess/attempt_18/supervised_pipeline.py", line 447, in <module>
+    run_pipeline(
+  File "/home/ubuntu/chess/attempt_18/supervised_pipeline.py", line 161, in run_pipeline
+    baseline_stats = evaluate_model(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 209, in evaluate_model
+    wins, draws, losses = _play_games_parallel(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 151, in _play_games_parallel
+    outcomes.append(fut.result())
+  File "/usr/lib/python3.10/concurrent/futures/_base.py", line 451, in result
+    return self.__get_result()
+  File "/usr/lib/python3.10/concurrent/futures/_base.py", line 403, in __get_result
+    raise self._exception
+ValueError: attempt to get argmax of an empty sequence

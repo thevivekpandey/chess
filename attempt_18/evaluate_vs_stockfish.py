@@ -1,17 +1,17 @@
 """
 Evaluate a trained model against Stockfish.
 
-Plays games with the policy network (legal-move-masked argmax / sampled from the
-policy head) against Stockfish at a chosen skill level and reports W/D/L, score
-and a rough ELO-difference estimate.
+Plays games with the network (move_search.choose_move: `search_depth` plies of
+value-head negamax, or the raw policy head when search_depth<=0) against Stockfish
+at a chosen skill level and reports W/D/L, score and a rough ELO-difference estimate.
 
 With num_workers > 1 the games are split across worker processes (each loads the
-model on CPU and runs its own Stockfish) - eval is otherwise pure serial Stockfish
-time. Batch-1 CPU inference is cheap relative to the 0.1s/move Stockfish budget, so
-keeping the model off the GPU here avoids CUDA-in-subprocess fragility for free.
+model and runs its own Stockfish). Batch-1/shallow-search inference is cheap relative
+to the 0.1s/move Stockfish budget.
 """
 
 import argparse
+import gc
 import multiprocessing as mp
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -23,13 +23,46 @@ import chess.engine
 import numpy as np
 import torch
 
+
+def _terminate_pool(executor):
+    """Force-kill any worker processes that didn't exit cleanly after shutdown.
+
+    PyTorch's CUDA-context finalize in a spawn worker can stall, so a worker
+    that has received the executor's sentinel may keep its Python process (and
+    its ~2 GB GPU memory mapping) alive long after `shutdown(wait=True)`
+    returns.  Across an iteration that's baseline-eval + play + candidate-eval
+    pools = ~60 leaked workers, which blows past the 80 GB GPU before the next
+    phase can allocate (run05.out).  Capture the worker handles BEFORE shutdown
+    (it nulls `_processes`), then explicitly terminate any survivor."""
+    procs_dict = getattr(executor, "_processes", None) or {}
+    procs = list(procs_dict.values())
+    executor.shutdown(wait=True)
+    for p in procs:
+        if not p.is_alive():
+            continue
+        try:
+            p.terminate()
+            p.join(timeout=2.0)
+        except Exception:  # noqa: BLE001
+            pass
+        if p.is_alive():
+            try:
+                p.kill()
+                p.join(timeout=1.0)
+            except Exception:  # noqa: BLE001
+                pass
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
 try:
     from tqdm import tqdm
 except ImportError:  # tqdm is optional - fall back to a no-op wrapper
     def tqdm(iterable=None, total=None, desc=None, **_kwargs):
         return iterable if iterable is not None else range(total or 0)
 
-from chess_engine import ChessNet, fen_to_tensor, move_to_policy_index
+from chess_engine import ChessNet
+from move_search import choose_move
 
 
 @dataclass
@@ -38,32 +71,6 @@ class GameResult:
     moves: int
     white_player: str
     black_player: str
-
-
-def get_model_move(model: ChessNet, board: chess.Board, device: torch.device,
-                   temperature: float = 0.1) -> chess.Move:
-    """Pick a legal move from the policy head (legal-move masked)."""
-    with torch.no_grad():
-        board_tensor = fen_to_tensor(board.fen()).unsqueeze(0).to(device)
-        _value, policy_logits = model(board_tensor)          # (1, 73, 8, 8)
-        flat = policy_logits.reshape(-1).float().cpu().numpy()  # (4672,)
-
-    legal_moves = list(board.legal_moves)
-    move_logits = np.full(len(legal_moves), -1e9, dtype=np.float64)
-    for i, mv in enumerate(legal_moves):
-        idx = move_to_policy_index(mv.uci())
-        if idx is not None:
-            src_row, src_col, plane = idx
-            move_logits[i] = flat[plane * 64 + src_row * 8 + src_col]
-
-    if temperature is None or temperature < 0.2:
-        return legal_moves[int(np.argmax(move_logits))]
-
-    move_logits = move_logits / float(temperature)
-    move_logits -= move_logits.max()
-    probs = np.exp(move_logits)
-    probs /= probs.sum()
-    return legal_moves[int(np.random.choice(len(legal_moves), p=probs))]
 
 
 def play_game_vs_stockfish(
@@ -75,6 +82,7 @@ def play_game_vs_stockfish(
     stockfish_time: float = 0.1,
     model_temperature: float = 0.1,
     max_moves: int = 200,
+    search_depth: int = 1,
 ) -> GameResult:
     board = chess.Board()
     with chess.engine.SimpleEngine.popen_uci(stockfish_path) as sf_engine:
@@ -85,7 +93,7 @@ def play_game_vs_stockfish(
 
         while not board.is_game_over() and len(board.move_stack) < max_moves:
             if board.turn == model_color:
-                move = get_model_move(model, board, device, model_temperature)
+                move = choose_move(model, board, device, search_depth, model_temperature)
             else:
                 move = sf_engine.play(board, chess.engine.Limit(time=stockfish_time)).move
             board.push(move)
@@ -142,17 +150,17 @@ def _eval_worker_init(model_path: str, device: str):
 
 
 def _eval_worker_play(args):
-    game_idx, stockfish_path, stockfish_level, stockfish_time, model_temperature = args
+    game_idx, stockfish_path, stockfish_level, stockfish_time, model_temperature, search_depth = args
     model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
     result = play_game_vs_stockfish(
         _WORKER_MODEL, stockfish_path, _WORKER_DEVICE, model_color,
-        stockfish_level, stockfish_time, model_temperature,
+        stockfish_level, stockfish_time, model_temperature, search_depth=search_depth,
     )
     return _model_outcome_value(result.result, model_color)
 
 
 def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
-                         stockfish_time, model_temperature, num_workers, device):
+                         stockfish_time, model_temperature, num_workers, device, search_depth):
     """Play num_games across num_workers processes; return (wins, draws, losses)."""
     n = max(1, min(int(num_workers), num_games))
     # 'spawn' so each worker gets a clean CUDA context (the parent may already
@@ -164,12 +172,13 @@ def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
     print(f"  (running {num_games} games across {n} worker process(es) on {device})", flush=True)
     outcomes = []
     report_every = max(1, num_games // 10)
-    with ProcessPoolExecutor(max_workers=n, mp_context=ctx,
-                             initializer=_eval_worker_init,
-                             initargs=(model_path, device)) as executor:
+    executor = ProcessPoolExecutor(max_workers=n, mp_context=ctx,
+                                   initializer=_eval_worker_init,
+                                   initargs=(model_path, device))
+    try:
         futures = [
             executor.submit(_eval_worker_play,
-                            (gi, stockfish_path, stockfish_level, stockfish_time, model_temperature))
+                            (gi, stockfish_path, stockfish_level, stockfish_time, model_temperature, search_depth))
             for gi in range(num_games)
         ]
         for fut in as_completed(futures):
@@ -177,6 +186,8 @@ def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
             done = len(outcomes)
             if done % report_every == 0 or done == num_games:
                 print(f"  [eval] {done}/{num_games} games done", flush=True)
+    finally:
+        _terminate_pool(executor)
     wins = sum(1 for v in outcomes if v == 1.0)
     draws = sum(1 for v in outcomes if v == 0.5)
     losses = sum(1 for v in outcomes if v == 0.0)
@@ -184,7 +195,7 @@ def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
 
 
 def _play_games_sequential(model_path, stockfish_path, num_games, stockfish_level,
-                           stockfish_time, model_temperature, device):
+                           stockfish_time, model_temperature, device, search_depth):
     """Play num_games sequentially in-process (model on `device`); return (wins, draws, losses)."""
     device_torch = torch.device(device)
     model = ChessNet()
@@ -198,7 +209,7 @@ def _play_games_sequential(model_path, stockfish_path, num_games, stockfish_leve
         model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
         result = play_game_vs_stockfish(
             model, stockfish_path, device_torch, model_color,
-            stockfish_level, stockfish_time, model_temperature,
+            stockfish_level, stockfish_time, model_temperature, search_depth=search_depth,
         )
         v = _model_outcome_value(result.result, model_color)
         if v == 1.0:
@@ -219,24 +230,26 @@ def evaluate_model(
     model_temperature: float = 0.1,
     device: str = "cuda",
     num_workers: int = 1,
+    search_depth: int = 1,
 ) -> Dict:
+    move_desc = f"{search_depth}-ply value search" if search_depth and search_depth >= 1 else "policy head only"
     print("=" * 80)
     print("EVALUATING MODEL VS STOCKFISH")
     print("=" * 80)
     print(f"Model: {model_path}")
     print(f"Stockfish level: {stockfish_level}  time: {stockfish_time}s/move  games: {num_games}  "
-          f"model temperature: {model_temperature}  workers: {num_workers}")
+          f"move selection: {move_desc}  model temperature: {model_temperature}  workers: {num_workers}")
     print()
 
     if num_workers and num_workers > 1 and num_games > 1:
         wins, draws, losses = _play_games_parallel(
             model_path, stockfish_path, num_games, stockfish_level,
-            stockfish_time, model_temperature, num_workers, device,
+            stockfish_time, model_temperature, num_workers, device, search_depth,
         )
     else:
         wins, draws, losses = _play_games_sequential(
             model_path, stockfish_path, num_games, stockfish_level,
-            stockfish_time, model_temperature, device,
+            stockfish_time, model_temperature, device, search_depth,
         )
 
     total_games = wins + draws + losses
@@ -270,16 +283,17 @@ def evaluate_model(
         "score": score,
         "stockfish_level": stockfish_level,
         "stockfish_time": stockfish_time,
+        "search_depth": search_depth,
     }
 
 
 def evaluate_model_progressive(model_path: str, stockfish_path: str,
                                games_per_level: int = 50, device: str = "cuda",
-                               num_workers: int = 1):
+                               num_workers: int = 1, search_depth: int = 1):
     print("=" * 80)
     print("PROGRESSIVE EVALUATION VS STOCKFISH")
     print("=" * 80)
-    print(f"Model: {model_path}  games/level: {games_per_level}  workers: {num_workers}\n")
+    print(f"Model: {model_path}  games/level: {games_per_level}  workers: {num_workers}  search_depth: {search_depth}\n")
 
     levels = [1, 5, 10, 15, 20]
     all_results = []
@@ -288,7 +302,7 @@ def evaluate_model_progressive(model_path: str, stockfish_path: str,
         stats = evaluate_model(
             model_path=model_path, stockfish_path=stockfish_path,
             num_games=games_per_level, stockfish_level=level,
-            stockfish_time=0.1, device=device, num_workers=num_workers,
+            stockfish_time=0.1, device=device, num_workers=num_workers, search_depth=search_depth,
         )
         all_results.append({"level": level, **stats})
 
@@ -309,9 +323,11 @@ if __name__ == "__main__":
     parser.add_argument("--games", type=int, default=100, help="Number of games")
     parser.add_argument("--level", type=int, default=10, help="Stockfish skill level (0-20)")
     parser.add_argument("--sf-time", type=float, default=0.1, help="Stockfish time per move (s)")
-    parser.add_argument("--temperature", type=float, default=0.1, help="Model sampling temperature")
-    parser.add_argument("--workers", type=int, default=8, help="Parallel game-playing workers (model runs on CPU when >1)")
-    parser.add_argument("--device", type=str, default="cuda", help="Device for the sequential (workers<=1) path")
+    parser.add_argument("--temperature", type=float, default=0.1, help="Model sampling temperature (<=0.2 => deterministic argmax)")
+    parser.add_argument("--search-depth", type=int, default=1,
+                        help="Plies of value-head negamax for the model's move selection (1 = pick by best resulting position; 0 = policy head only)")
+    parser.add_argument("--workers", type=int, default=8, help="Parallel game-playing workers")
+    parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda/mps)")
     parser.add_argument("--progressive", action="store_true", help="Test against multiple levels")
     args = parser.parse_args()
 
@@ -319,11 +335,12 @@ if __name__ == "__main__":
         evaluate_model_progressive(
             model_path=args.model, stockfish_path=args.stockfish,
             games_per_level=args.games, device=args.device, num_workers=args.workers,
+            search_depth=args.search_depth,
         )
     else:
         evaluate_model(
             model_path=args.model, stockfish_path=args.stockfish,
             num_games=args.games, stockfish_level=args.level,
             stockfish_time=args.sf_time, model_temperature=args.temperature,
-            device=args.device, num_workers=args.workers,
+            device=args.device, num_workers=args.workers, search_depth=args.search_depth,
         )

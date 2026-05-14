@@ -11,6 +11,7 @@ Orchestrates the full training pipeline:
 This implements "Plan 2" from the discussion - learning from Stockfish as a teacher.
 """
 
+import gc
 import os
 import json
 import shutil
@@ -18,10 +19,26 @@ from pathlib import Path
 from typing import Dict, List
 import time
 
+import torch
+
 from generate_sf_training_data import generate_training_data
 from train_supervised import train_supervised
 from evaluate_vs_stockfish import evaluate_model
 from mix_datasets import mix_datasets
+
+
+def _release_cuda():
+    """Drop parent-process CUDA state between phases.
+
+    `train_supervised` runs in-process and leaves the model + optimizer +
+    autograd buffers resident on GPU; the subsequent eval/play pools then
+    spawn 20 workers that each load the model again.  Without this cleanup
+    the parent keeps ~2 GB of obsolete training tensors on GPU for the rest
+    of the iteration.
+    """
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def run_pipeline(
@@ -35,12 +52,14 @@ def run_pipeline(
     training_epochs: int = 10,
     batch_size: int = 256,
     learning_rate: float = 0.001,
+    policy_weight: float = 1.0,
     sf_depth: int = 20,
     sf_multipv: int = 5,
     sf_time: float = 0.1,
     sf_nodes: int = 0,
     sf_hash: int = 128,
     gen_max_moves: int = 160,
+    search_depth: int = 1,
     eval_games: int = 100,
     initial_sf_level: int = 0,
     num_workers: int = 8,
@@ -84,7 +103,8 @@ def run_pipeline(
     print(f"Foundation ratio: {foundation_ratio if foundation_data_path else 'N/A'}")
     print(f"Iterations: {num_iterations}")
     print(f"Games/iteration: {games_per_iteration}")
-    print(f"Training epochs: {training_epochs}")
+    print(f"Training epochs: {training_epochs}  policy_weight: {policy_weight}")
+    print(f"Move selection (self-play & eval): {f'{search_depth}-ply value search' if search_depth and search_depth >= 1 else 'policy head only'}")
     if sf_nodes and sf_nodes > 0:
         print(f"SF labeling budget: {sf_nodes} nodes/position, multi-PV: {sf_multipv}")
     elif sf_time and sf_time > 0:
@@ -100,10 +120,12 @@ def run_pipeline(
     data_dir = os.path.join(base_dir, "data")
     models_dir = os.path.join(base_dir, "models")
     logs_dir = os.path.join(base_dir, "logs")
+    games_dir = os.path.join(base_dir, "games")  # self-play PGNs, one file per iteration
 
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(models_dir, exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
+    os.makedirs(games_dir, exist_ok=True)
 
     # Copy initial model to models directory
     current_model_path = os.path.join(models_dir, "model_M0.pth")
@@ -160,7 +182,8 @@ def run_pipeline(
                 stockfish_level=current_sf_level,
                 stockfish_time=0.1,
                 device=device,
-                num_workers=num_workers
+                num_workers=num_workers,
+                search_depth=search_depth
             )
             timings['baseline_eval'] = time.time() - t
             baseline_score = baseline_stats['score']
@@ -194,6 +217,7 @@ def run_pipeline(
         # Step 1: Generate training data
         print(f"\n[Step 1/4] Generating training data...")
         raw_data_path = os.path.join(data_dir, f"iter{iteration}_raw.csv")
+        games_pgn_path = os.path.join(games_dir, f"iter{iteration}.pgn")
 
         gen_info = generate_training_data(
             model_path=current_model_path,
@@ -208,7 +232,9 @@ def run_pipeline(
             sf_nodes=sf_nodes,
             sf_hash=sf_hash,
             max_moves=gen_max_moves,
-            device=device
+            device=device,
+            save_games_path=games_pgn_path,
+            search_depth=search_depth
         ) or {}
         timings['play'] = gen_info.get('play_seconds', 0.0)
         timings['label'] = gen_info.get('label_seconds', 0.0)
@@ -264,15 +290,20 @@ def run_pipeline(
             num_epochs=training_epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
-            policy_weight=1.0,
+            policy_weight=policy_weight,
             value_weight=1.0,
             device=device,
             save_every=training_epochs  # Only save final
         )
         timings['train'] = time.time() - t
+        # Free the training-time model/optimizer GPU buffers before the
+        # candidate-eval pool tries to allocate.
+        _release_cuda()
 
-        # Update current model to latest trained
-        new_model_path = os.path.join(iter_models_dir, f"model_epoch_{training_epochs}.pth")
+        # Update current model to the best-validation epoch from this iteration.
+        # (Using model_epoch_{N}.pth promotes the most-overfit checkpoint when val loss
+        # increases monotonically after epoch 1, which is what we observed in run_01.)
+        new_model_path = os.path.join(iter_models_dir, "model_best.pth")
         candidate_model_path = os.path.join(models_dir, f"model_M{iteration}.pth")
         shutil.copy(new_model_path, candidate_model_path)
 
@@ -286,7 +317,8 @@ def run_pipeline(
             stockfish_level=current_sf_level,
             stockfish_time=0.1,
             device=device,
-            num_workers=num_workers
+            num_workers=num_workers,
+            search_depth=search_depth
         )
         timings['candidate_eval'] = time.time() - t
         candidate_score = eval_stats['score']
@@ -303,12 +335,15 @@ def run_pipeline(
         level_advanced = False
         sf_level_for_log = current_sf_level
 
+        # Training trunk always advances to the latest candidate so we don't
+        # discard the gradient progress from this iteration's training.  The
+        # Stockfish-labeled data is still ground truth even when the candidate
+        # underperforms the baseline, so continued training is well-defined.
+        current_model_path = candidate_model_path
+
         if candidate_score > baseline_score:
             print(f"\n✓ PROMOTED! Candidate beats baseline.")
             shutil.copy(candidate_model_path, best_model_path)
-
-            # CRITICAL: Advance training trunk to promoted model
-            current_model_path = best_model_path
             promoted = True
 
             # Update baseline for next iteration
@@ -331,10 +366,7 @@ def run_pipeline(
                 level_start_iteration = iteration + 1
         else:
             print(f"\n✗ REJECTED. Candidate does not beat baseline.")
-            print(f"  Training trunk reset to best model (discarding M{iteration})")
-
-            # CRITICAL: Reset trunk to best model (don't compound degradation)
-            current_model_path = best_model_path
+            print(f"  best_model_path retained; trunk continues from M{iteration} (no reset)")
 
         # Log results
         iter_time = time.time() - iter_start_time
@@ -416,12 +448,17 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs per iteration")
     parser.add_argument("--batch-size", type=int, default=256, help="Training batch size")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--policy-weight", type=float, default=1.0,
+                        help="Weight on the policy cross-entropy term (value-loss weight is fixed at 1.0; m0 was trained with 0.1)")
     parser.add_argument("--sf-time", type=float, default=0.1, help="Seconds of Stockfish per labeled position (0 disables; default 0.1)")
     parser.add_argument("--sf-nodes", type=int, default=0, help="Stockfish nodes per labeled position (overrides --sf-time/--sf-depth if >0)")
     parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish depth: a search ceiling when --sf-time>0, or the budget when --sf-time=0")
     parser.add_argument("--sf-multipv", type=int, default=5, help="Stockfish multi-PV count")
     parser.add_argument("--sf-hash", type=int, default=128, help="Hash (MB) per Stockfish labeling worker")
     parser.add_argument("--gen-max-moves", type=int, default=160, help="Max plies per generated game")
+    parser.add_argument("--search-depth", type=int, default=1,
+                        help="Plies of value-head negamax for move selection in self-play AND eval games "
+                             "(1 = pick the move whose resulting position the value head likes best; 0 = policy head only)")
     parser.add_argument("--eval-games", type=int, default=100, help="Evaluation games")
     parser.add_argument("--initial-level", type=int, default=0, help="Starting Stockfish level (default: 0, auto-advances)")
     parser.add_argument("--workers", type=int, default=8, help="Parallel Stockfish labeling workers (1 thread each)")
@@ -440,12 +477,14 @@ if __name__ == "__main__":
         training_epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.lr,
+        policy_weight=args.policy_weight,
         sf_depth=args.sf_depth,
         sf_multipv=args.sf_multipv,
         sf_time=args.sf_time,
         sf_nodes=args.sf_nodes,
         sf_hash=args.sf_hash,
         gen_max_moves=args.gen_max_moves,
+        search_depth=args.search_depth,
         eval_games=args.eval_games,
         initial_sf_level=args.initial_level,
         num_workers=args.workers,

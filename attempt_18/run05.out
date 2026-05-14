@@ -1,0 +1,289 @@
+================================================================================
+SUPERVISED LEARNING PIPELINE WITH STOCKFISH
+================================================================================
+Base directory: runs/run_05
+Initial model: ../attempt_17/m0.pt
+Stockfish: /usr/games/stockfish
+Foundation data: ../attempt_02/training_data_augmented.csv
+Foundation ratio: 0.3
+Iterations: 50
+Games/iteration: 1000
+Training epochs: 3  policy_weight: 0.1
+Move selection (self-play & eval): 2-ply value search
+SF labeling budget: 0.1s/position (depth<=20 ceiling), multi-PV: 5
+Eval games: 100
+Starting SF level: 2 (auto-advances when >60%)
+
+✓ Copied initial model to runs/run_05/models/model_M0.pth
+
+================================================================================
+ITERATION 1/50  (Stockfish level 2)
+================================================================================
+
+[Level 2] Establishing baseline: best model vs Stockfish L2 ...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_05/models/model_best.pth
+Stockfish level: 2  time: 0.1s/move  games: 100  move selection: 2-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   25 (25.0%)
+Draws:  19 (19.0%)
+Losses: 56 (56.0%)
+Score:  0.345 (34.5%)
+Estimated ELO difference vs SF L2: -111
+  Baseline: 0.345 (34.5%)  [eval took 74s]
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 2-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_05/models/model_M0.pth
+  Output: runs/run_05/data/iter1_raw.csv
+  Self-play PGN: runs/run_05/games/iter1.pgn
+
+Step 1: playing games (2-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 13149 positions
+  [play] 200/1000 games done | 26731 positions
+  [play] 300/1000 games done | 39053 positions
+  [play] 400/1000 games done | 52170 positions
+  [play] 500/1000 games done | 65231 positions
+  [play] 600/1000 games done | 78000 positions
+  [play] 700/1000 games done | 91210 positions
+  [play] 800/1000 games done | 104335 positions
+  [play] 900/1000 games done | 117594 positions
+  [play] 1000/1000 games done | 130628 positions
+  Collected 130628 positions (126878 unique) from 1000 games in 625.9s
+  Average plies per game: 130.6
+  Saved 1000 self-play games to runs/run_05/games/iter1.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1586/126878 positions | 127s elapsed | ~12 pos/s | ETA ~10033s
+  [label] 2/80 batches | 3172/126878 positions | 135s elapsed | ~23 pos/s | ETA ~5279s
+  [label] 3/80 batches | 4758/126878 positions | 136s elapsed | ~35 pos/s | ETA ~3493s
+  [label] 4/80 batches | 6344/126878 positions | 136s elapsed | ~47 pos/s | ETA ~2589s
+  [label] 5/80 batches | 7930/126878 positions | 140s elapsed | ~57 pos/s | ETA ~2100s
+  [label] 6/80 batches | 9516/126878 positions | 141s elapsed | ~68 pos/s | ETA ~1736s
+  [label] 7/80 batches | 11102/126878 positions | 141s elapsed | ~79 pos/s | ETA ~1470s
+  [label] 8/80 batches | 12688/126878 positions | 142s elapsed | ~90 pos/s | ETA ~1274s
+  [label] 9/80 batches | 14274/126878 positions | 142s elapsed | ~100 pos/s | ETA ~1121s
+  [label] 10/80 batches | 15860/126878 positions | 143s elapsed | ~111 pos/s | ETA ~1000s
+  [label] 11/80 batches | 17446/126878 positions | 143s elapsed | ~122 pos/s | ETA ~899s
+  [label] 12/80 batches | 19032/126878 positions | 144s elapsed | ~132 pos/s | ETA ~816s
+  [label] 13/80 batches | 20618/126878 positions | 144s elapsed | ~143 pos/s | ETA ~744s
+  [label] 14/80 batches | 22204/126878 positions | 145s elapsed | ~153 pos/s | ETA ~682s
+  [label] 15/80 batches | 23790/126878 positions | 145s elapsed | ~164 pos/s | ETA ~628s
+  [label] 16/80 batches | 25376/126878 positions | 145s elapsed | ~174 pos/s | ETA ~582s
+  [label] 17/80 batches | 26962/126878 positions | 146s elapsed | ~184 pos/s | ETA ~543s
+  [label] 18/80 batches | 28548/126878 positions | 147s elapsed | ~194 pos/s | ETA ~507s
+  [label] 19/80 batches | 30134/126878 positions | 149s elapsed | ~202 pos/s | ETA ~478s
+  [label] 20/80 batches | 31720/126878 positions | 152s elapsed | ~209 pos/s | ETA ~456s
+  [label] 21/80 batches | 33306/126878 positions | 270s elapsed | ~123 pos/s | ETA ~760s
+  [label] 22/80 batches | 34892/126878 positions | 275s elapsed | ~127 pos/s | ETA ~724s
+  [label] 23/80 batches | 36478/126878 positions | 276s elapsed | ~132 pos/s | ETA ~684s
+  [label] 24/80 batches | 38064/126878 positions | 279s elapsed | ~136 pos/s | ETA ~652s
+  [label] 25/80 batches | 39650/126878 positions | 280s elapsed | ~142 pos/s | ETA ~616s
+  [label] 26/80 batches | 41236/126878 positions | 281s elapsed | ~147 pos/s | ETA ~584s
+  [label] 27/80 batches | 42822/126878 positions | 285s elapsed | ~150 pos/s | ETA ~560s
+  [label] 28/80 batches | 44408/126878 positions | 287s elapsed | ~155 pos/s | ETA ~532s
+  [label] 29/80 batches | 45994/126878 positions | 287s elapsed | ~160 pos/s | ETA ~505s
+  [label] 30/80 batches | 47580/126878 positions | 288s elapsed | ~165 pos/s | ETA ~480s
+  [label] 31/80 batches | 49166/126878 positions | 289s elapsed | ~170 pos/s | ETA ~457s
+  [label] 32/80 batches | 50752/126878 positions | 289s elapsed | ~175 pos/s | ETA ~434s
+  [label] 33/80 batches | 52338/126878 positions | 290s elapsed | ~181 pos/s | ETA ~412s
+  [label] 34/80 batches | 53924/126878 positions | 290s elapsed | ~186 pos/s | ETA ~392s
+  [label] 35/80 batches | 55510/126878 positions | 292s elapsed | ~190 pos/s | ETA ~375s
+  [label] 36/80 batches | 57096/126878 positions | 293s elapsed | ~195 pos/s | ETA ~358s
+  [label] 37/80 batches | 58682/126878 positions | 295s elapsed | ~199 pos/s | ETA ~342s
+  [label] 38/80 batches | 60268/126878 positions | 295s elapsed | ~205 pos/s | ETA ~326s
+  [label] 39/80 batches | 61854/126878 positions | 296s elapsed | ~209 pos/s | ETA ~311s
+  [label] 40/80 batches | 63440/126878 positions | 298s elapsed | ~213 pos/s | ETA ~298s
+  [label] 41/80 batches | 65026/126878 positions | 410s elapsed | ~159 pos/s | ETA ~390s
+  [label] 42/80 batches | 66612/126878 positions | 417s elapsed | ~160 pos/s | ETA ~377s
+  [label] 43/80 batches | 68198/126878 positions | 421s elapsed | ~162 pos/s | ETA ~362s
+  [label] 44/80 batches | 69784/126878 positions | 421s elapsed | ~166 pos/s | ETA ~345s
+  [label] 45/80 batches | 71370/126878 positions | 424s elapsed | ~168 pos/s | ETA ~330s
+  [label] 46/80 batches | 72956/126878 positions | 424s elapsed | ~172 pos/s | ETA ~314s
+  [label] 47/80 batches | 74542/126878 positions | 426s elapsed | ~175 pos/s | ETA ~299s
+  [label] 48/80 batches | 76128/126878 positions | 430s elapsed | ~177 pos/s | ETA ~286s
+  [label] 49/80 batches | 77714/126878 positions | 431s elapsed | ~180 pos/s | ETA ~273s
+  [label] 50/80 batches | 79300/126878 positions | 432s elapsed | ~184 pos/s | ETA ~259s
+  [label] 51/80 batches | 80886/126878 positions | 433s elapsed | ~187 pos/s | ETA ~246s
+  [label] 52/80 batches | 82472/126878 positions | 433s elapsed | ~190 pos/s | ETA ~233s
+  [label] 53/80 batches | 84058/126878 positions | 435s elapsed | ~193 pos/s | ETA ~222s
+  [label] 54/80 batches | 85644/126878 positions | 437s elapsed | ~196 pos/s | ETA ~210s
+  [label] 55/80 batches | 87230/126878 positions | 437s elapsed | ~200 pos/s | ETA ~199s
+  [label] 56/80 batches | 88816/126878 positions | 437s elapsed | ~203 pos/s | ETA ~187s
+  [label] 57/80 batches | 90402/126878 positions | 438s elapsed | ~207 pos/s | ETA ~177s
+  [label] 58/80 batches | 91988/126878 positions | 441s elapsed | ~209 pos/s | ETA ~167s
+  [label] 59/80 batches | 93574/126878 positions | 443s elapsed | ~211 pos/s | ETA ~158s
+  [label] 60/80 batches | 95160/126878 positions | 447s elapsed | ~213 pos/s | ETA ~149s
+  [label] 61/80 batches | 96746/126878 positions | 554s elapsed | ~175 pos/s | ETA ~173s
+  [label] 62/80 batches | 98332/126878 positions | 554s elapsed | ~177 pos/s | ETA ~161s
+  [label] 63/80 batches | 99918/126878 positions | 562s elapsed | ~178 pos/s | ETA ~152s
+  [label] 64/80 batches | 101504/126878 positions | 565s elapsed | ~180 pos/s | ETA ~141s
+  [label] 65/80 batches | 103090/126878 positions | 567s elapsed | ~182 pos/s | ETA ~131s
+  [label] 66/80 batches | 104676/126878 positions | 569s elapsed | ~184 pos/s | ETA ~121s
+  [label] 67/80 batches | 106262/126878 positions | 571s elapsed | ~186 pos/s | ETA ~111s
+  [label] 68/80 batches | 107848/126878 positions | 571s elapsed | ~189 pos/s | ETA ~101s
+  [label] 69/80 batches | 109434/126878 positions | 572s elapsed | ~191 pos/s | ETA ~91s
+  [label] 70/80 batches | 111020/126878 positions | 573s elapsed | ~194 pos/s | ETA ~82s
+  [label] 71/80 batches | 112606/126878 positions | 574s elapsed | ~196 pos/s | ETA ~73s
+  [label] 72/80 batches | 114192/126878 positions | 574s elapsed | ~199 pos/s | ETA ~64s
+  [label] 73/80 batches | 115778/126878 positions | 577s elapsed | ~201 pos/s | ETA ~55s
+  [label] 74/80 batches | 117364/126878 positions | 579s elapsed | ~203 pos/s | ETA ~47s
+  [label] 75/80 batches | 118950/126878 positions | 581s elapsed | ~205 pos/s | ETA ~39s
+  [label] 76/80 batches | 120536/126878 positions | 581s elapsed | ~207 pos/s | ETA ~31s
+  [label] 77/80 batches | 122122/126878 positions | 582s elapsed | ~210 pos/s | ETA ~23s
+  [label] 78/80 batches | 123708/126878 positions | 586s elapsed | ~211 pos/s | ETA ~15s
+  [label] 79/80 batches | 125292/126878 positions | 587s elapsed | ~214 pos/s | ETA ~7s
+  [label] 80/80 batches | 126878/126878 positions | 587s elapsed | ~216 pos/s | ETA ~0s
+Labeled 126878 positions in 587.2s
+
+Step 3: writing runs/run_05/data/iter1_raw.csv...
+Saved 126878 training examples to runs/run_05/data/iter1_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.86  std 49.49  min -99.99  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_05/data/iter1_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 126878 examples
+  Sampled foundation: 54376 examples
+  Mixed total: 181254 examples
+  Train: 163128 examples
+  Val: 18126 examples
+
+Saving...
+✓ Saved train to: runs/run_05/data/iter1_train.csv
+✓ Saved val to: runs/run_05/data/iter1_val.csv
+
+Final statistics:
+  Train - Foundation: 48992 (30.0%)
+  Train - New: 114136 (70.0%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_05/data/iter1_train.csv
+Val data:     runs/run_05/data/iter1_val.csv
+Initial model:runs/run_05/models/model_M0.pth
+Output dir:   runs/run_05/models/iter1
+Epochs=3  batch=256  lr=0.0001  policy_weight=0.1  device=cuda
+
+Loading runs/run_05/data/iter1_train.csv...
+Precomputing 163,128 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 163,128 / 163,128 positions...
+Done. Board tensors shape: torch.Size([163128, 18, 8, 8])
+Policy indices shape: torch.Size([163128, 5]) (sparse, ~3.3 MB)
+Legal move indices shape: torch.Size([163128, 128]) (sparse, ~41.8 MB)
+Positions with policy targets: 152,305 / 163,128 (93.4%)
+Loading runs/run_05/data/iter1_val.csv...
+Precomputing 18,126 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 18,126 / 18,126 positions...
+Done. Board tensors shape: torch.Size([18126, 18, 8, 8])
+Policy indices shape: torch.Size([18126, 5]) (sparse, ~0.4 MB)
+Legal move indices shape: torch.Size([18126, 128]) (sparse, ~4.6 MB)
+Positions with policy targets: 16,888 / 18,126 (93.2%)
+Train batches: 638  Val batches: 71
+Loading weights from runs/run_05/models/model_M0.pth
+Epoch 01/3  train 0.2534 (v 0.0483 p 2.0509)  |  val 0.2474 (v 0.0429 p 2.0450)  mae 9.11  top3/5 76.0%/86.7%
+  -> new best (val loss 0.2474)
+Epoch 02/3  train 0.2366 (v 0.0380 p 1.9859)  |  val 0.2507 (v 0.0458 p 2.0491)  mae 9.31  top3/5 75.9%/86.6%
+Epoch 03/3  train 0.2268 (v 0.0325 p 1.9433)  |  val 0.2594 (v 0.0533 p 2.0606)  mae 9.58  top3/5 75.5%/86.0%
+
+Training complete. Best val loss 0.2474. Checkpoints in runs/run_05/models/iter1
+
+[Step 4/4] Evaluating candidate (M1) vs Stockfish level 2...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_05/models/model_M1.pth
+Stockfish level: 2  time: 0.1s/move  games: 100  move selection: 2-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/concurrent/futures/process.py", line 246, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 122, in _eval_worker_play
+    result = play_game_vs_stockfish(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 63, in play_game_vs_stockfish
+    move = choose_move(model, board, device, search_depth, model_temperature)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 248, in choose_move
+    mv = _search_move(model, board, device, int(search_depth), temperature)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 196, in _search_move
+    pols = _policy_logits_batch(model, boards, device)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/ubuntu/chess/attempt_18/move_search.py", line 122, in _policy_logits_batch
+    _value, policy = model(x)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/chess/attempt_18/chess_engine.py", line 798, in forward
+    out = block(out)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/chess/attempt_18/chess_engine.py", line 717, in forward
+    out = self.bn2(self.conv2(out))
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 553, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/ubuntu/myvenv/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 548, in _conv_forward
+    return F.conv2d(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 79.18 GiB of which 5.25 MiB is free. Process 8208 has 2.44 GiB memory in use. Process 8215 has 2.02 GiB memory in use. Process 8217 has 2.74 GiB memory in use. Process 8213 has 1.93 GiB memory in use. Process 8207 has 2.00 GiB memory in use. Process 8219 has 2.43 GiB memory in use. Process 8209 has 2.23 GiB memory in use. Process 8212 has 2.29 GiB memory in use. Process 8203 has 2.01 GiB memory in use. Process 8214 has 2.72 GiB memory in use. Process 8220 has 2.16 GiB memory in use. Process 8222 has 2.01 GiB memory in use. Process 8224 has 2.16 GiB memory in use. Process 8206 has 2.19 GiB memory in use. Process 8221 has 2.25 GiB memory in use. Process 8211 has 2.22 GiB memory in use. Process 8218 has 2.32 GiB memory in use. Process 8210 has 1.84 GiB memory in use. Process 8216 has 2.33 GiB memory in use. Process 8223 has 1.83 GiB memory in use. Process 22194 has 886.00 MiB memory in use. Process 22196 has 886.00 MiB memory in use. Process 22195 has 886.00 MiB memory in use. Process 22187 has 886.00 MiB memory in use. Process 22192 has 886.00 MiB memory in use. Process 22197 has 886.00 MiB memory in use. Process 22193 has 886.00 MiB memory in use. Process 22190 has 886.00 MiB memory in use. Process 22200 has 886.00 MiB memory in use. Process 22191 has 886.00 MiB memory in use. Process 22199 has 886.00 MiB memory in use. Process 22189 has 886.00 MiB memory in use. Process 22201 has 886.00 MiB memory in use. Process 22183 has 886.00 MiB memory in use. Process 22188 has 886.00 MiB memory in use. Process 22198 has 886.00 MiB memory in use. Process 22204 has 886.00 MiB memory in use. Process 22202 has 886.00 MiB memory in use. Process 22186 has 886.00 MiB memory in use. Process 22203 has 886.00 MiB memory in use. Process 22882 has 1.82 GiB memory in use. Process 25695 has 866.00 MiB memory in use. Process 25690 has 866.00 MiB memory in use. Process 25692 has 884.00 MiB memory in use. Process 25687 has 842.00 MiB memory in use. Process 25691 has 842.00 MiB memory in use. Process 25702 has 856.00 MiB memory in use. Process 25686 has 704.00 MiB memory in use. Process 25693 has 862.00 MiB memory in use. Process 25694 has 842.00 MiB memory in use. Process 25697 has 856.00 MiB memory in use. Process 25703 has 704.00 MiB memory in use. Process 25698 has 862.00 MiB memory in use. Process 25683 has 864.00 MiB memory in use. Process 25701 has 704.00 MiB memory in use. Including non-PyTorch memory, this process has 724.00 MiB memory in use. Process 25699 has 704.00 MiB memory in use. Process 25689 has 704.00 MiB memory in use. Process 25700 has 862.00 MiB memory in use. Process 25696 has 704.00 MiB memory in use. Process 25704 has 704.00 MiB memory in use. Of the allocated memory 101.52 MiB is allocated by PyTorch, and 492.00 KiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/chess/attempt_18/supervised_pipeline.py", line 449, in <module>
+    run_pipeline(
+  File "/home/ubuntu/chess/attempt_18/supervised_pipeline.py", line 293, in run_pipeline
+    eval_stats = evaluate_model(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 209, in evaluate_model
+    wins, draws, losses = _play_games_parallel(
+  File "/home/ubuntu/chess/attempt_18/evaluate_vs_stockfish.py", line 151, in _play_games_parallel
+    outcomes.append(fut.result())
+  File "/usr/lib/python3.10/concurrent/futures/_base.py", line 451, in result
+    return self.__get_result()
+  File "/usr/lib/python3.10/concurrent/futures/_base.py", line 403, in __get_result
+    raise self._exception
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 79.18 GiB of which 5.25 MiB is free. Process 8208 has 2.44 GiB memory in use. Process 8215 has 2.02 GiB memory in use. Process 8217 has 2.74 GiB memory in use. Process 8213 has 1.93 GiB memory in use. Process 8207 has 2.00 GiB memory in use. Process 8219 has 2.43 GiB memory in use. Process 8209 has 2.23 GiB memory in use. Process 8212 has 2.29 GiB memory in use. Process 8203 has 2.01 GiB memory in use. Process 8214 has 2.72 GiB memory in use. Process 8220 has 2.16 GiB memory in use. Process 8222 has 2.01 GiB memory in use. Process 8224 has 2.16 GiB memory in use. Process 8206 has 2.19 GiB memory in use. Process 8221 has 2.25 GiB memory in use. Process 8211 has 2.22 GiB memory in use. Process 8218 has 2.32 GiB memory in use. Process 8210 has 1.84 GiB memory in use. Process 8216 has 2.33 GiB memory in use. Process 8223 has 1.83 GiB memory in use. Process 22194 has 886.00 MiB memory in use. Process 22196 has 886.00 MiB memory in use. Process 22195 has 886.00 MiB memory in use. Process 22187 has 886.00 MiB memory in use. Process 22192 has 886.00 MiB memory in use. Process 22197 has 886.00 MiB memory in use. Process 22193 has 886.00 MiB memory in use. Process 22190 has 886.00 MiB memory in use. Process 22200 has 886.00 MiB memory in use. Process 22191 has 886.00 MiB memory in use. Process 22199 has 886.00 MiB memory in use. Process 22189 has 886.00 MiB memory in use. Process 22201 has 886.00 MiB memory in use. Process 22183 has 886.00 MiB memory in use. Process 22188 has 886.00 MiB memory in use. Process 22198 has 886.00 MiB memory in use. Process 22204 has 886.00 MiB memory in use. Process 22202 has 886.00 MiB memory in use. Process 22186 has 886.00 MiB memory in use. Process 22203 has 886.00 MiB memory in use. Process 22882 has 1.82 GiB memory in use. Process 25695 has 866.00 MiB memory in use. Process 25690 has 866.00 MiB memory in use. Process 25692 has 884.00 MiB memory in use. Process 25687 has 842.00 MiB memory in use. Process 25691 has 842.00 MiB memory in use. Process 25702 has 856.00 MiB memory in use. Process 25686 has 704.00 MiB memory in use. Process 25693 has 862.00 MiB memory in use. Process 25694 has 842.00 MiB memory in use. Process 25697 has 856.00 MiB memory in use. Process 25703 has 704.00 MiB memory in use. Process 25698 has 862.00 MiB memory in use. Process 25683 has 864.00 MiB memory in use. Process 25701 has 704.00 MiB memory in use. Including non-PyTorch memory, this process has 724.00 MiB memory in use. Process 25699 has 704.00 MiB memory in use. Process 25689 has 704.00 MiB memory in use. Process 25700 has 862.00 MiB memory in use. Process 25696 has 704.00 MiB memory in use. Process 25704 has 704.00 MiB memory in use. Of the allocated memory 101.52 MiB is allocated by PyTorch, and 492.00 KiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)

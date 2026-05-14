@@ -10,8 +10,7 @@ Produces, in `output_path`:
   - model_epoch_<N>.pth for every saved epoch (always at least the final epoch)
   - model_best.pth      (lowest validation loss seen)
 
-`model_epoch_<num_epochs>.pth` is guaranteed to exist on success - the pipeline
-(supervised_pipeline.py) promotes that checkpoint.
+The pipeline (supervised_pipeline.py) promotes `model_best.pth`.
 """
 
 import argparse

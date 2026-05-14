@@ -1,0 +1,101 @@
+================================================================================
+SUPERVISED LEARNING PIPELINE WITH STOCKFISH
+================================================================================
+Base directory: runs/run_03
+Initial model: ../attempt_17/m0.pt
+Stockfish: /usr/games/stockfish
+Foundation data: ../attempt_02/training_data_augmented.csv
+Foundation ratio: 0.3
+Iterations: 50
+Games/iteration: 1000
+Training epochs: 3  policy_weight: 0.1
+Move selection (self-play & eval): 2-ply value search
+SF labeling budget: 0.1s/position (depth<=20 ceiling), multi-PV: 5
+Eval games: 100
+Starting SF level: 1 (auto-advances when >60%)
+
+✓ Copied initial model to runs/run_03/models/model_M0.pth
+
+================================================================================
+ITERATION 1/50  (Stockfish level 1)
+================================================================================
+
+[Level 1] Establishing baseline: best model vs Stockfish L1 ...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_03/models/model_best.pth
+Stockfish level: 1  time: 0.1s/move  games: 100  move selection: 2-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   51 (51.0%)
+Draws:  25 (25.0%)
+Losses: 24 (24.0%)
+Score:  0.635 (63.5%)
+Estimated ELO difference vs SF L1: +96
+  Baseline: 0.635 (63.5%)  [eval took 174s]
+  🚀 Best model already exceeds 60% at level 1 — advancing to level 2 without training.
+⏱  Iteration 1: play 0s · label 0s · mix 0s · train 0s · eval 174s · total 174s (2.9 min)  [level 1 skipped]
+
+================================================================================
+ITERATION 2/50  (Stockfish level 2)
+================================================================================
+
+[Level 2] Establishing baseline: best model vs Stockfish L2 ...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_03/models/model_best.pth
+Stockfish level: 2  time: 0.1s/move  games: 100  move selection: 2-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   36 (36.0%)
+Draws:  10 (10.0%)
+Losses: 54 (54.0%)
+Score:  0.410 (41.0%)
+Estimated ELO difference vs SF L2: -63
+  Baseline: 0.410 (41.0%)  [eval took 188s]
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 2-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_03/models/model_M0.pth
+  Output: runs/run_03/data/iter2_raw.csv
+  Self-play PGN: runs/run_03/games/iter2.pgn
+
+Step 1: playing games (2-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 15106 positions
+/usr/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

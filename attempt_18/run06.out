@@ -1,0 +1,2738 @@
+================================================================================
+SUPERVISED LEARNING PIPELINE WITH STOCKFISH
+================================================================================
+Base directory: runs/run_06
+Initial model: ../attempt_17/m0.pt
+Stockfish: /usr/games/stockfish
+Foundation data: ../attempt_02/training_data_augmented.csv
+Foundation ratio: 0.3
+Iterations: 50
+Games/iteration: 1000
+Training epochs: 3  policy_weight: 1.0
+Move selection (self-play & eval): 1-ply value search
+SF labeling budget: 0.1s/position (depth<=20 ceiling), multi-PV: 5
+Eval games: 100
+Starting SF level: 3 (auto-advances when >60%)
+
+✓ Copied initial model to runs/run_06/models/model_M0.pth
+
+================================================================================
+ITERATION 1/50  (Stockfish level 3)
+================================================================================
+
+[Level 3] Establishing baseline: best model vs Stockfish L3 ...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_best.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   12 (12.0%)
+Draws:  23 (23.0%)
+Losses: 65 (65.0%)
+Score:  0.235 (23.5%)
+Estimated ELO difference vs SF L3: -205
+  Baseline: 0.235 (23.5%)  [eval took 57s]
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M0.pth
+  Output: runs/run_06/data/iter1_raw.csv
+  Self-play PGN: runs/run_06/games/iter1.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11698 positions
+  [play] 200/1000 games done | 22635 positions
+  [play] 300/1000 games done | 34273 positions
+  [play] 400/1000 games done | 46011 positions
+  [play] 500/1000 games done | 58603 positions
+  [play] 600/1000 games done | 70586 positions
+  [play] 700/1000 games done | 82870 positions
+  [play] 800/1000 games done | 95390 positions
+  [play] 900/1000 games done | 107887 positions
+  [play] 1000/1000 games done | 119936 positions
+  Collected 119936 positions (116184 unique) from 1000 games in 335.1s
+  Average plies per game: 119.9
+  Saved 1000 self-play games to runs/run_06/games/iter1.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1453/116184 positions | 128s elapsed | ~11 pos/s | ETA ~10089s
+  [label] 2/80 batches | 2906/116184 positions | 131s elapsed | ~22 pos/s | ETA ~5092s
+  [label] 3/80 batches | 4359/116184 positions | 132s elapsed | ~33 pos/s | ETA ~3377s
+  [label] 4/80 batches | 5812/116184 positions | 132s elapsed | ~44 pos/s | ETA ~2506s
+  [label] 5/80 batches | 7265/116184 positions | 133s elapsed | ~55 pos/s | ETA ~1991s
+  [label] 6/80 batches | 8718/116184 positions | 133s elapsed | ~66 pos/s | ETA ~1639s
+  [label] 7/80 batches | 10171/116184 positions | 133s elapsed | ~76 pos/s | ETA ~1389s
+  [label] 8/80 batches | 11624/116184 positions | 135s elapsed | ~86 pos/s | ETA ~1211s
+  [label] 9/80 batches | 13077/116184 positions | 135s elapsed | ~97 pos/s | ETA ~1062s
+  [label] 10/80 batches | 14530/116184 positions | 135s elapsed | ~108 pos/s | ETA ~944s
+  [label] 11/80 batches | 15983/116184 positions | 136s elapsed | ~117 pos/s | ETA ~855s
+  [label] 12/80 batches | 17436/116184 positions | 137s elapsed | ~127 pos/s | ETA ~779s
+  [label] 13/80 batches | 18889/116184 positions | 138s elapsed | ~137 pos/s | ETA ~708s
+  [label] 14/80 batches | 20342/116184 positions | 138s elapsed | ~147 pos/s | ETA ~650s
+  [label] 15/80 batches | 21795/116184 positions | 138s elapsed | ~158 pos/s | ETA ~599s
+  [label] 16/80 batches | 23248/116184 positions | 139s elapsed | ~168 pos/s | ETA ~554s
+  [label] 17/80 batches | 24701/116184 positions | 140s elapsed | ~177 pos/s | ETA ~518s
+  [label] 18/80 batches | 26154/116184 positions | 141s elapsed | ~186 pos/s | ETA ~485s
+  [label] 19/80 batches | 27607/116184 positions | 141s elapsed | ~196 pos/s | ETA ~453s
+  [label] 20/80 batches | 29060/116184 positions | 141s elapsed | ~206 pos/s | ETA ~424s
+  [label] 21/80 batches | 30513/116184 positions | 262s elapsed | ~116 pos/s | ETA ~736s
+  [label] 22/80 batches | 31966/116184 positions | 264s elapsed | ~121 pos/s | ETA ~695s
+  [label] 23/80 batches | 33419/116184 positions | 264s elapsed | ~126 pos/s | ETA ~655s
+  [label] 24/80 batches | 34872/116184 positions | 265s elapsed | ~131 pos/s | ETA ~618s
+  [label] 25/80 batches | 36325/116184 positions | 267s elapsed | ~136 pos/s | ETA ~586s
+  [label] 26/80 batches | 37778/116184 positions | 269s elapsed | ~140 pos/s | ETA ~559s
+  [label] 27/80 batches | 39231/116184 positions | 271s elapsed | ~145 pos/s | ETA ~531s
+  [label] 28/80 batches | 40684/116184 positions | 272s elapsed | ~150 pos/s | ETA ~504s
+  [label] 29/80 batches | 42137/116184 positions | 272s elapsed | ~155 pos/s | ETA ~479s
+  [label] 30/80 batches | 43590/116184 positions | 273s elapsed | ~160 pos/s | ETA ~454s
+  [label] 31/80 batches | 45043/116184 positions | 275s elapsed | ~164 pos/s | ETA ~434s
+  [label] 32/80 batches | 46496/116184 positions | 275s elapsed | ~169 pos/s | ETA ~412s
+  [label] 33/80 batches | 47949/116184 positions | 275s elapsed | ~174 pos/s | ETA ~391s
+  [label] 34/80 batches | 49402/116184 positions | 275s elapsed | ~180 pos/s | ETA ~372s
+  [label] 35/80 batches | 50855/116184 positions | 276s elapsed | ~184 pos/s | ETA ~354s
+  [label] 36/80 batches | 52308/116184 positions | 276s elapsed | ~190 pos/s | ETA ~337s
+  [label] 37/80 batches | 53761/116184 positions | 277s elapsed | ~194 pos/s | ETA ~321s
+  [label] 38/80 batches | 55214/116184 positions | 278s elapsed | ~199 pos/s | ETA ~307s
+  [label] 39/80 batches | 56667/116184 positions | 279s elapsed | ~203 pos/s | ETA ~293s
+  [label] 40/80 batches | 58120/116184 positions | 280s elapsed | ~208 pos/s | ETA ~280s
+  [label] 41/80 batches | 59573/116184 positions | 390s elapsed | ~153 pos/s | ETA ~371s
+  [label] 42/80 batches | 61026/116184 positions | 397s elapsed | ~154 pos/s | ETA ~359s
+  [label] 43/80 batches | 62479/116184 positions | 398s elapsed | ~157 pos/s | ETA ~342s
+  [label] 44/80 batches | 63932/116184 positions | 400s elapsed | ~160 pos/s | ETA ~327s
+  [label] 45/80 batches | 65385/116184 positions | 402s elapsed | ~163 pos/s | ETA ~312s
+  [label] 46/80 batches | 66838/116184 positions | 405s elapsed | ~165 pos/s | ETA ~299s
+  [label] 47/80 batches | 68291/116184 positions | 406s elapsed | ~168 pos/s | ETA ~285s
+  [label] 48/80 batches | 69744/116184 positions | 409s elapsed | ~171 pos/s | ETA ~272s
+  [label] 49/80 batches | 71197/116184 positions | 409s elapsed | ~174 pos/s | ETA ~259s
+  [label] 50/80 batches | 72650/116184 positions | 410s elapsed | ~177 pos/s | ETA ~245s
+  [label] 51/80 batches | 74103/116184 positions | 411s elapsed | ~180 pos/s | ETA ~233s
+  [label] 52/80 batches | 75556/116184 positions | 412s elapsed | ~183 pos/s | ETA ~221s
+  [label] 53/80 batches | 77009/116184 positions | 412s elapsed | ~187 pos/s | ETA ~210s
+  [label] 54/80 batches | 78462/116184 positions | 412s elapsed | ~190 pos/s | ETA ~198s
+  [label] 55/80 batches | 79915/116184 positions | 413s elapsed | ~194 pos/s | ETA ~187s
+  [label] 56/80 batches | 81368/116184 positions | 413s elapsed | ~197 pos/s | ETA ~177s
+  [label] 57/80 batches | 82821/116184 positions | 415s elapsed | ~199 pos/s | ETA ~167s
+  [label] 58/80 batches | 84274/116184 positions | 417s elapsed | ~202 pos/s | ETA ~158s
+  [label] 59/80 batches | 85727/116184 positions | 419s elapsed | ~205 pos/s | ETA ~149s
+  [label] 60/80 batches | 87180/116184 positions | 421s elapsed | ~207 pos/s | ETA ~140s
+  [label] 61/80 batches | 88633/116184 positions | 529s elapsed | ~167 pos/s | ETA ~165s
+  [label] 62/80 batches | 90086/116184 positions | 530s elapsed | ~170 pos/s | ETA ~154s
+  [label] 63/80 batches | 91539/116184 positions | 537s elapsed | ~171 pos/s | ETA ~145s
+  [label] 64/80 batches | 92992/116184 positions | 537s elapsed | ~173 pos/s | ETA ~134s
+  [label] 65/80 batches | 94445/116184 positions | 538s elapsed | ~175 pos/s | ETA ~124s
+  [label] 66/80 batches | 95898/116184 positions | 541s elapsed | ~177 pos/s | ETA ~114s
+  [label] 67/80 batches | 97351/116184 positions | 541s elapsed | ~180 pos/s | ETA ~105s
+  [label] 68/80 batches | 98804/116184 positions | 543s elapsed | ~182 pos/s | ETA ~95s
+  [label] 69/80 batches | 100257/116184 positions | 543s elapsed | ~184 pos/s | ETA ~86s
+  [label] 70/80 batches | 101710/116184 positions | 544s elapsed | ~187 pos/s | ETA ~77s
+  [label] 71/80 batches | 103163/116184 positions | 544s elapsed | ~189 pos/s | ETA ~69s
+  [label] 72/80 batches | 104616/116184 positions | 545s elapsed | ~192 pos/s | ETA ~60s
+  [label] 73/80 batches | 106069/116184 positions | 546s elapsed | ~194 pos/s | ETA ~52s
+  [label] 74/80 batches | 107522/116184 positions | 548s elapsed | ~196 pos/s | ETA ~44s
+  [label] 75/80 batches | 108919/116184 positions | 550s elapsed | ~198 pos/s | ETA ~37s
+  [label] 76/80 batches | 110372/116184 positions | 551s elapsed | ~200 pos/s | ETA ~29s
+  [label] 77/80 batches | 111825/116184 positions | 553s elapsed | ~202 pos/s | ETA ~22s
+  [label] 78/80 batches | 113278/116184 positions | 553s elapsed | ~205 pos/s | ETA ~14s
+  [label] 79/80 batches | 114731/116184 positions | 555s elapsed | ~207 pos/s | ETA ~7s
+  [label] 80/80 batches | 116184/116184 positions | 555s elapsed | ~209 pos/s | ETA ~0s
+Labeled 116184 positions in 555.5s
+
+Step 3: writing runs/run_06/data/iter1_raw.csv...
+Saved 116184 training examples to runs/run_06/data/iter1_raw.csv
+
+Eval column (white pov, pawns):
+  mean 0.39  std 46.84  min -100.00  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter1_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 116184 examples
+  Sampled foundation: 49793 examples
+  Mixed total: 165977 examples
+  Train: 149379 examples
+  Val: 16598 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter1_train.csv
+✓ Saved val to: runs/run_06/data/iter1_val.csv
+
+Final statistics:
+  Train - Foundation: 44926 (30.1%)
+  Train - New: 104453 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter1_train.csv
+Val data:     runs/run_06/data/iter1_val.csv
+Initial model:runs/run_06/models/model_M0.pth
+Output dir:   runs/run_06/models/iter1
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter1_train.csv...
+Precomputing 149,379 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 149,379 / 149,379 positions...
+Done. Board tensors shape: torch.Size([149379, 18, 8, 8])
+Policy indices shape: torch.Size([149379, 5]) (sparse, ~3.0 MB)
+Legal move indices shape: torch.Size([149379, 128]) (sparse, ~38.2 MB)
+Positions with policy targets: 140,736 / 149,379 (94.2%)
+Loading runs/run_06/data/iter1_val.csv...
+Precomputing 16,598 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,598 / 16,598 positions...
+Done. Board tensors shape: torch.Size([16598, 18, 8, 8])
+Policy indices shape: torch.Size([16598, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16598, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,617 / 16,598 (94.1%)
+Train batches: 584  Val batches: 65
+Loading weights from runs/run_06/models/model_M0.pth
+Epoch 01/3  train 2.0851 (v 0.0450 p 2.0400)  |  val 2.0715 (v 0.0443 p 2.0272)  mae 9.20  top3/5 76.6%/87.0%
+  -> new best (val loss 2.0715)
+Epoch 02/3  train 1.9650 (v 0.0388 p 1.9263)  |  val 2.0682 (v 0.0372 p 2.0310)  mae 8.23  top3/5 75.9%/86.6%
+  -> new best (val loss 2.0682)
+Epoch 03/3  train 1.8843 (v 0.0348 p 1.8495)  |  val 2.0830 (v 0.0374 p 2.0456)  mae 8.64  top3/5 75.6%/86.4%
+
+Training complete. Best val loss 2.0682. Checkpoints in runs/run_06/models/iter1
+
+[Step 4/4] Evaluating candidate (M1) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M1.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   18 (18.0%)
+Draws:  13 (13.0%)
+Losses: 69 (69.0%)
+Score:  0.245 (24.5%)
+Estimated ELO difference vs SF L3: -196
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.235 (23.5%)
+  Candidate (M1): 0.245 (24.5%)
+  Improvement:       +0.010 (1.0%)
+
+✓ PROMOTED! Candidate beats baseline.
+
+⏱  Iteration 1: play 335s · label 555s · mix 111s · train 44s · eval 111s · total 1161s (19.4 min)
+
+================================================================================
+ITERATION 2/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M1.pth
+  Output: runs/run_06/data/iter2_raw.csv
+  Self-play PGN: runs/run_06/games/iter2.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 12095 positions
+  [play] 200/1000 games done | 23801 positions
+  [play] 300/1000 games done | 35342 positions
+  [play] 400/1000 games done | 47653 positions
+  [play] 500/1000 games done | 59232 positions
+  [play] 600/1000 games done | 70859 positions
+  [play] 700/1000 games done | 82976 positions
+  [play] 800/1000 games done | 94585 positions
+  [play] 900/1000 games done | 107353 positions
+  [play] 1000/1000 games done | 119036 positions
+  Collected 119036 positions (115254 unique) from 1000 games in 333.7s
+  Average plies per game: 119.0
+  Saved 1000 self-play games to runs/run_06/games/iter2.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1441/115254 positions | 126s elapsed | ~11 pos/s | ETA ~9937s
+  [label] 2/80 batches | 2882/115254 positions | 131s elapsed | ~22 pos/s | ETA ~5110s
+  [label] 3/80 batches | 4323/115254 positions | 132s elapsed | ~33 pos/s | ETA ~3376s
+  [label] 4/80 batches | 5764/115254 positions | 132s elapsed | ~44 pos/s | ETA ~2508s
+  [label] 5/80 batches | 7205/115254 positions | 133s elapsed | ~54 pos/s | ETA ~1988s
+  [label] 6/80 batches | 8646/115254 positions | 133s elapsed | ~65 pos/s | ETA ~1635s
+  [label] 7/80 batches | 10087/115254 positions | 133s elapsed | ~76 pos/s | ETA ~1386s
+  [label] 8/80 batches | 11528/115254 positions | 133s elapsed | ~87 pos/s | ETA ~1199s
+  [label] 9/80 batches | 12969/115254 positions | 134s elapsed | ~97 pos/s | ETA ~1053s
+  [label] 10/80 batches | 14410/115254 positions | 135s elapsed | ~107 pos/s | ETA ~942s
+  [label] 11/80 batches | 15851/115254 positions | 135s elapsed | ~118 pos/s | ETA ~845s
+  [label] 12/80 batches | 17292/115254 positions | 135s elapsed | ~128 pos/s | ETA ~767s
+  [label] 13/80 batches | 18733/115254 positions | 137s elapsed | ~137 pos/s | ETA ~707s
+  [label] 14/80 batches | 20174/115254 positions | 138s elapsed | ~146 pos/s | ETA ~651s
+  [label] 15/80 batches | 21615/115254 positions | 138s elapsed | ~156 pos/s | ETA ~599s
+  [label] 16/80 batches | 23056/115254 positions | 139s elapsed | ~166 pos/s | ETA ~554s
+  [label] 17/80 batches | 24497/115254 positions | 140s elapsed | ~175 pos/s | ETA ~519s
+  [label] 18/80 batches | 25938/115254 positions | 140s elapsed | ~185 pos/s | ETA ~483s
+  [label] 19/80 batches | 27379/115254 positions | 141s elapsed | ~195 pos/s | ETA ~451s
+  [label] 20/80 batches | 28820/115254 positions | 141s elapsed | ~204 pos/s | ETA ~424s
+  [label] 21/80 batches | 30261/115254 positions | 259s elapsed | ~117 pos/s | ETA ~728s
+  [label] 22/80 batches | 31702/115254 positions | 263s elapsed | ~120 pos/s | ETA ~694s
+  [label] 23/80 batches | 33143/115254 positions | 264s elapsed | ~125 pos/s | ETA ~655s
+  [label] 24/80 batches | 34584/115254 positions | 267s elapsed | ~129 pos/s | ETA ~623s
+  [label] 25/80 batches | 36025/115254 positions | 267s elapsed | ~135 pos/s | ETA ~587s
+  [label] 26/80 batches | 37466/115254 positions | 267s elapsed | ~140 pos/s | ETA ~555s
+  [label] 27/80 batches | 38907/115254 positions | 267s elapsed | ~145 pos/s | ETA ~525s
+  [label] 28/80 batches | 40348/115254 positions | 268s elapsed | ~151 pos/s | ETA ~497s
+  [label] 29/80 batches | 41789/115254 positions | 268s elapsed | ~156 pos/s | ETA ~471s
+  [label] 30/80 batches | 43230/115254 positions | 268s elapsed | ~161 pos/s | ETA ~446s
+  [label] 31/80 batches | 44671/115254 positions | 269s elapsed | ~166 pos/s | ETA ~424s
+  [label] 32/80 batches | 46112/115254 positions | 269s elapsed | ~171 pos/s | ETA ~404s
+  [label] 33/80 batches | 47553/115254 positions | 270s elapsed | ~176 pos/s | ETA ~384s
+  [label] 34/80 batches | 48994/115254 positions | 272s elapsed | ~180 pos/s | ETA ~368s
+  [label] 35/80 batches | 50435/115254 positions | 273s elapsed | ~185 pos/s | ETA ~351s
+  [label] 36/80 batches | 51876/115254 positions | 274s elapsed | ~189 pos/s | ETA ~335s
+  [label] 37/80 batches | 53317/115254 positions | 277s elapsed | ~193 pos/s | ETA ~322s
+  [label] 38/80 batches | 54758/115254 positions | 277s elapsed | ~198 pos/s | ETA ~306s
+  [label] 39/80 batches | 56199/115254 positions | 279s elapsed | ~201 pos/s | ETA ~293s
+  [label] 40/80 batches | 57640/115254 positions | 280s elapsed | ~206 pos/s | ETA ~280s
+  [label] 41/80 batches | 59081/115254 positions | 395s elapsed | ~150 pos/s | ETA ~376s
+  [label] 42/80 batches | 60522/115254 positions | 396s elapsed | ~153 pos/s | ETA ~358s
+  [label] 43/80 batches | 61963/115254 positions | 396s elapsed | ~156 pos/s | ETA ~341s
+  [label] 44/80 batches | 63404/115254 positions | 397s elapsed | ~160 pos/s | ETA ~325s
+  [label] 45/80 batches | 64845/115254 positions | 399s elapsed | ~163 pos/s | ETA ~310s
+  [label] 46/80 batches | 66286/115254 positions | 402s elapsed | ~165 pos/s | ETA ~297s
+  [label] 47/80 batches | 67727/115254 positions | 403s elapsed | ~168 pos/s | ETA ~283s
+  [label] 48/80 batches | 69168/115254 positions | 403s elapsed | ~172 pos/s | ETA ~268s
+  [label] 49/80 batches | 70609/115254 positions | 403s elapsed | ~175 pos/s | ETA ~255s
+  [label] 50/80 batches | 72050/115254 positions | 405s elapsed | ~178 pos/s | ETA ~243s
+  [label] 51/80 batches | 73491/115254 positions | 406s elapsed | ~181 pos/s | ETA ~231s
+  [label] 52/80 batches | 74932/115254 positions | 408s elapsed | ~184 pos/s | ETA ~220s
+  [label] 53/80 batches | 76373/115254 positions | 411s elapsed | ~186 pos/s | ETA ~209s
+  [label] 54/80 batches | 77814/115254 positions | 411s elapsed | ~189 pos/s | ETA ~198s
+  [label] 55/80 batches | 79255/115254 positions | 412s elapsed | ~192 pos/s | ETA ~187s
+  [label] 56/80 batches | 80696/115254 positions | 412s elapsed | ~196 pos/s | ETA ~177s
+  [label] 57/80 batches | 82137/115254 positions | 413s elapsed | ~199 pos/s | ETA ~166s
+  [label] 58/80 batches | 83578/115254 positions | 414s elapsed | ~202 pos/s | ETA ~157s
+  [label] 59/80 batches | 85019/115254 positions | 417s elapsed | ~204 pos/s | ETA ~148s
+  [label] 60/80 batches | 86460/115254 positions | 419s elapsed | ~206 pos/s | ETA ~140s
+  [label] 61/80 batches | 87901/115254 positions | 526s elapsed | ~167 pos/s | ETA ~164s
+  [label] 62/80 batches | 89342/115254 positions | 527s elapsed | ~170 pos/s | ETA ~153s
+  [label] 63/80 batches | 90783/115254 positions | 529s elapsed | ~172 pos/s | ETA ~143s
+  [label] 64/80 batches | 92224/115254 positions | 532s elapsed | ~173 pos/s | ETA ~133s
+  [label] 65/80 batches | 93665/115254 positions | 533s elapsed | ~176 pos/s | ETA ~123s
+  [label] 66/80 batches | 95106/115254 positions | 533s elapsed | ~178 pos/s | ETA ~113s
+  [label] 67/80 batches | 96547/115254 positions | 540s elapsed | ~179 pos/s | ETA ~105s
+  [label] 68/80 batches | 97988/115254 positions | 540s elapsed | ~181 pos/s | ETA ~95s
+  [label] 69/80 batches | 99429/115254 positions | 541s elapsed | ~184 pos/s | ETA ~86s
+  [label] 70/80 batches | 100870/115254 positions | 541s elapsed | ~187 pos/s | ETA ~77s
+  [label] 71/80 batches | 102311/115254 positions | 541s elapsed | ~189 pos/s | ETA ~68s
+  [label] 72/80 batches | 103752/115254 positions | 542s elapsed | ~191 pos/s | ETA ~60s
+  [label] 73/80 batches | 105193/115254 positions | 542s elapsed | ~194 pos/s | ETA ~52s
+  [label] 74/80 batches | 106634/115254 positions | 542s elapsed | ~197 pos/s | ETA ~44s
+  [label] 75/80 batches | 108075/115254 positions | 544s elapsed | ~198 pos/s | ETA ~36s
+  [label] 76/80 batches | 109516/115254 positions | 545s elapsed | ~201 pos/s | ETA ~29s
+  [label] 77/80 batches | 110931/115254 positions | 548s elapsed | ~202 pos/s | ETA ~21s
+  [label] 78/80 batches | 112372/115254 positions | 548s elapsed | ~205 pos/s | ETA ~14s
+  [label] 79/80 batches | 113813/115254 positions | 551s elapsed | ~206 pos/s | ETA ~7s
+  [label] 80/80 batches | 115254/115254 positions | 554s elapsed | ~208 pos/s | ETA ~0s
+Labeled 115254 positions in 554.7s
+
+Step 3: writing runs/run_06/data/iter2_raw.csv...
+Saved 115254 training examples to runs/run_06/data/iter2_raw.csv
+
+Eval column (white pov, pawns):
+  mean 0.26  std 46.40  min -99.99  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter2_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 115254 examples
+  Sampled foundation: 49394 examples
+  Mixed total: 164648 examples
+  Train: 148183 examples
+  Val: 16465 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter2_train.csv
+✓ Saved val to: runs/run_06/data/iter2_val.csv
+
+Final statistics:
+  Train - Foundation: 44577 (30.1%)
+  Train - New: 103606 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter2_train.csv
+Val data:     runs/run_06/data/iter2_val.csv
+Initial model:runs/run_06/models/model_M1.pth
+Output dir:   runs/run_06/models/iter2
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter2_train.csv...
+Precomputing 148,183 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 148,183 / 148,183 positions...
+Done. Board tensors shape: torch.Size([148183, 18, 8, 8])
+Policy indices shape: torch.Size([148183, 5]) (sparse, ~3.0 MB)
+Legal move indices shape: torch.Size([148183, 128]) (sparse, ~37.9 MB)
+Positions with policy targets: 139,706 / 148,183 (94.3%)
+Loading runs/run_06/data/iter2_val.csv...
+Precomputing 16,465 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,465 / 16,465 positions...
+Done. Board tensors shape: torch.Size([16465, 18, 8, 8])
+Policy indices shape: torch.Size([16465, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16465, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,473 / 16,465 (94.0%)
+Train batches: 579  Val batches: 65
+Loading weights from runs/run_06/models/model_M1.pth
+Epoch 01/3  train 2.0427 (v 0.0433 p 1.9994)  |  val 2.0795 (v 0.0442 p 2.0353)  mae 9.27  top3/5 76.1%/86.7%
+  -> new best (val loss 2.0795)
+Epoch 02/3  train 1.9278 (v 0.0384 p 1.8894)  |  val 2.0829 (v 0.0398 p 2.0431)  mae 8.73  top3/5 76.1%/86.6%
+Epoch 03/3  train 1.8518 (v 0.0345 p 1.8174)  |  val 2.1013 (v 0.0399 p 2.0614)  mae 8.92  top3/5 76.0%/86.4%
+
+Training complete. Best val loss 2.0795. Checkpoints in runs/run_06/models/iter2
+
+[Step 4/4] Evaluating candidate (M2) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M2.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   12 (12.0%)
+Draws:  17 (17.0%)
+Losses: 71 (71.0%)
+Score:  0.205 (20.5%)
+Estimated ELO difference vs SF L3: -235
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M2): 0.205 (20.5%)
+  Improvement:       -0.040 (-4.0%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M2 (no reset)
+
+⏱  Iteration 2: play 334s · label 555s · mix 107s · train 40s · eval 56s · total 1095s (18.3 min)
+
+================================================================================
+ITERATION 3/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M2.pth
+  Output: runs/run_06/data/iter3_raw.csv
+  Self-play PGN: runs/run_06/games/iter3.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11522 positions
+  [play] 200/1000 games done | 23166 positions
+  [play] 300/1000 games done | 33756 positions
+  [play] 400/1000 games done | 45198 positions
+  [play] 500/1000 games done | 56905 positions
+  [play] 600/1000 games done | 69119 positions
+  [play] 700/1000 games done | 80953 positions
+  [play] 800/1000 games done | 93132 positions
+  [play] 900/1000 games done | 106167 positions
+  [play] 1000/1000 games done | 118150 positions
+  Collected 118150 positions (114353 unique) from 1000 games in 332.5s
+  Average plies per game: 118.2
+  Saved 1000 self-play games to runs/run_06/games/iter3.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1430/114353 positions | 131s elapsed | ~11 pos/s | ETA ~10381s
+  [label] 2/80 batches | 2860/114353 positions | 132s elapsed | ~22 pos/s | ETA ~5135s
+  [label] 3/80 batches | 4290/114353 positions | 132s elapsed | ~32 pos/s | ETA ~3392s
+  [label] 4/80 batches | 5720/114353 positions | 132s elapsed | ~43 pos/s | ETA ~2514s
+  [label] 5/80 batches | 7150/114353 positions | 134s elapsed | ~54 pos/s | ETA ~2002s
+  [label] 6/80 batches | 8580/114353 positions | 134s elapsed | ~64 pos/s | ETA ~1653s
+  [label] 7/80 batches | 10010/114353 positions | 134s elapsed | ~74 pos/s | ETA ~1401s
+  [label] 8/80 batches | 11440/114353 positions | 135s elapsed | ~85 pos/s | ETA ~1215s
+  [label] 9/80 batches | 12870/114353 positions | 135s elapsed | ~95 pos/s | ETA ~1068s
+  [label] 10/80 batches | 14300/114353 positions | 136s elapsed | ~105 pos/s | ETA ~948s
+  [label] 11/80 batches | 15730/114353 positions | 136s elapsed | ~116 pos/s | ETA ~850s
+  [label] 12/80 batches | 17160/114353 positions | 137s elapsed | ~126 pos/s | ETA ~774s
+  [label] 13/80 batches | 18590/114353 positions | 138s elapsed | ~135 pos/s | ETA ~709s
+  [label] 14/80 batches | 20020/114353 positions | 138s elapsed | ~145 pos/s | ETA ~649s
+  [label] 15/80 batches | 21450/114353 positions | 139s elapsed | ~155 pos/s | ETA ~600s
+  [label] 16/80 batches | 22880/114353 positions | 139s elapsed | ~165 pos/s | ETA ~554s
+  [label] 17/80 batches | 24310/114353 positions | 139s elapsed | ~174 pos/s | ETA ~517s
+  [label] 18/80 batches | 25740/114353 positions | 140s elapsed | ~184 pos/s | ETA ~482s
+  [label] 19/80 batches | 27170/114353 positions | 140s elapsed | ~193 pos/s | ETA ~451s
+  [label] 20/80 batches | 28600/114353 positions | 141s elapsed | ~203 pos/s | ETA ~422s
+  [label] 21/80 batches | 30030/114353 positions | 260s elapsed | ~115 pos/s | ETA ~731s
+  [label] 22/80 batches | 31460/114353 positions | 262s elapsed | ~120 pos/s | ETA ~691s
+  [label] 23/80 batches | 32890/114353 positions | 266s elapsed | ~124 pos/s | ETA ~659s
+  [label] 24/80 batches | 34320/114353 positions | 266s elapsed | ~129 pos/s | ETA ~621s
+  [label] 25/80 batches | 35750/114353 positions | 268s elapsed | ~133 pos/s | ETA ~589s
+  [label] 26/80 batches | 37180/114353 positions | 268s elapsed | ~138 pos/s | ETA ~557s
+  [label] 27/80 batches | 38610/114353 positions | 269s elapsed | ~143 pos/s | ETA ~529s
+  [label] 28/80 batches | 40040/114353 positions | 270s elapsed | ~148 pos/s | ETA ~501s
+  [label] 29/80 batches | 41470/114353 positions | 271s elapsed | ~153 pos/s | ETA ~476s
+  [label] 30/80 batches | 42900/114353 positions | 271s elapsed | ~158 pos/s | ETA ~452s
+  [label] 31/80 batches | 44330/114353 positions | 272s elapsed | ~163 pos/s | ETA ~430s
+  [label] 32/80 batches | 45760/114353 positions | 273s elapsed | ~168 pos/s | ETA ~409s
+  [label] 33/80 batches | 47190/114353 positions | 273s elapsed | ~173 pos/s | ETA ~389s
+  [label] 34/80 batches | 48620/114353 positions | 273s elapsed | ~178 pos/s | ETA ~369s
+  [label] 35/80 batches | 50050/114353 positions | 274s elapsed | ~183 pos/s | ETA ~352s
+  [label] 36/80 batches | 51480/114353 positions | 274s elapsed | ~188 pos/s | ETA ~335s
+  [label] 37/80 batches | 52910/114353 positions | 275s elapsed | ~192 pos/s | ETA ~320s
+  [label] 38/80 batches | 54340/114353 positions | 275s elapsed | ~197 pos/s | ETA ~304s
+  [label] 39/80 batches | 55770/114353 positions | 277s elapsed | ~201 pos/s | ETA ~291s
+  [label] 40/80 batches | 57200/114353 positions | 277s elapsed | ~206 pos/s | ETA ~277s
+  [label] 41/80 batches | 58630/114353 positions | 392s elapsed | ~149 pos/s | ETA ~373s
+  [label] 42/80 batches | 60060/114353 positions | 396s elapsed | ~152 pos/s | ETA ~358s
+  [label] 43/80 batches | 61490/114353 positions | 396s elapsed | ~155 pos/s | ETA ~340s
+  [label] 44/80 batches | 62920/114353 positions | 399s elapsed | ~158 pos/s | ETA ~326s
+  [label] 45/80 batches | 64350/114353 positions | 400s elapsed | ~161 pos/s | ETA ~311s
+  [label] 46/80 batches | 65780/114353 positions | 404s elapsed | ~163 pos/s | ETA ~298s
+  [label] 47/80 batches | 67210/114353 positions | 405s elapsed | ~166 pos/s | ETA ~284s
+  [label] 48/80 batches | 68640/114353 positions | 405s elapsed | ~169 pos/s | ETA ~270s
+  [label] 49/80 batches | 70070/114353 positions | 406s elapsed | ~173 pos/s | ETA ~256s
+  [label] 50/80 batches | 71500/114353 positions | 406s elapsed | ~176 pos/s | ETA ~243s
+  [label] 51/80 batches | 72930/114353 positions | 406s elapsed | ~179 pos/s | ETA ~231s
+  [label] 52/80 batches | 74360/114353 positions | 408s elapsed | ~182 pos/s | ETA ~219s
+  [label] 53/80 batches | 75790/114353 positions | 408s elapsed | ~186 pos/s | ETA ~208s
+  [label] 54/80 batches | 77220/114353 positions | 409s elapsed | ~189 pos/s | ETA ~197s
+  [label] 55/80 batches | 78650/114353 positions | 409s elapsed | ~192 pos/s | ETA ~186s
+  [label] 56/80 batches | 80080/114353 positions | 410s elapsed | ~196 pos/s | ETA ~175s
+  [label] 57/80 batches | 81510/114353 positions | 412s elapsed | ~198 pos/s | ETA ~166s
+  [label] 58/80 batches | 82940/114353 positions | 413s elapsed | ~201 pos/s | ETA ~156s
+  [label] 59/80 batches | 84370/114353 positions | 413s elapsed | ~204 pos/s | ETA ~147s
+  [label] 60/80 batches | 85800/114353 positions | 416s elapsed | ~206 pos/s | ETA ~139s
+  [label] 61/80 batches | 87230/114353 positions | 522s elapsed | ~167 pos/s | ETA ~162s
+  [label] 62/80 batches | 88660/114353 positions | 528s elapsed | ~168 pos/s | ETA ~153s
+  [label] 63/80 batches | 90090/114353 positions | 528s elapsed | ~171 pos/s | ETA ~142s
+  [label] 64/80 batches | 91520/114353 positions | 529s elapsed | ~173 pos/s | ETA ~132s
+  [label] 65/80 batches | 92950/114353 positions | 530s elapsed | ~175 pos/s | ETA ~122s
+  [label] 66/80 batches | 94380/114353 positions | 532s elapsed | ~178 pos/s | ETA ~113s
+  [label] 67/80 batches | 95810/114353 positions | 536s elapsed | ~179 pos/s | ETA ~104s
+  [label] 68/80 batches | 97240/114353 positions | 536s elapsed | ~181 pos/s | ETA ~94s
+  [label] 69/80 batches | 98670/114353 positions | 537s elapsed | ~184 pos/s | ETA ~85s
+  [label] 70/80 batches | 100100/114353 positions | 538s elapsed | ~186 pos/s | ETA ~77s
+  [label] 71/80 batches | 101530/114353 positions | 539s elapsed | ~188 pos/s | ETA ~68s
+  [label] 72/80 batches | 102960/114353 positions | 540s elapsed | ~191 pos/s | ETA ~60s
+  [label] 73/80 batches | 104343/114353 positions | 541s elapsed | ~193 pos/s | ETA ~52s
+  [label] 74/80 batches | 105773/114353 positions | 541s elapsed | ~195 pos/s | ETA ~44s
+  [label] 75/80 batches | 107203/114353 positions | 542s elapsed | ~198 pos/s | ETA ~36s
+  [label] 76/80 batches | 108633/114353 positions | 543s elapsed | ~200 pos/s | ETA ~29s
+  [label] 77/80 batches | 110063/114353 positions | 546s elapsed | ~201 pos/s | ETA ~21s
+  [label] 78/80 batches | 111493/114353 positions | 546s elapsed | ~204 pos/s | ETA ~14s
+  [label] 79/80 batches | 112923/114353 positions | 547s elapsed | ~206 pos/s | ETA ~7s
+  [label] 80/80 batches | 114353/114353 positions | 548s elapsed | ~209 pos/s | ETA ~0s
+Labeled 114353 positions in 548.7s
+
+Step 3: writing runs/run_06/data/iter3_raw.csv...
+Saved 114353 training examples to runs/run_06/data/iter3_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.76  std 45.61  min -100.00  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter3_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 114353 examples
+  Sampled foundation: 49008 examples
+  Mixed total: 163361 examples
+  Train: 147024 examples
+  Val: 16337 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter3_train.csv
+✓ Saved val to: runs/run_06/data/iter3_val.csv
+
+Final statistics:
+  Train - Foundation: 44227 (30.1%)
+  Train - New: 102797 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter3_train.csv
+Val data:     runs/run_06/data/iter3_val.csv
+Initial model:runs/run_06/models/model_M2.pth
+Output dir:   runs/run_06/models/iter3
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter3_train.csv...
+Precomputing 147,024 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 147,024 / 147,024 positions...
+Done. Board tensors shape: torch.Size([147024, 18, 8, 8])
+Policy indices shape: torch.Size([147024, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([147024, 128]) (sparse, ~37.6 MB)
+Positions with policy targets: 138,903 / 147,024 (94.5%)
+Loading runs/run_06/data/iter3_val.csv...
+Precomputing 16,337 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,337 / 16,337 positions...
+Done. Board tensors shape: torch.Size([16337, 18, 8, 8])
+Policy indices shape: torch.Size([16337, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16337, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,447 / 16,337 (94.6%)
+Train batches: 575  Val batches: 64
+Loading weights from runs/run_06/models/model_M2.pth
+Epoch 01/3  train 2.0250 (v 0.0428 p 1.9822)  |  val 2.0650 (v 0.0388 p 2.0262)  mae 8.64  top3/5 76.7%/87.0%
+  -> new best (val loss 2.0650)
+Epoch 02/3  train 1.9122 (v 0.0374 p 1.8748)  |  val 2.0741 (v 0.0391 p 2.0350)  mae 8.30  top3/5 76.5%/86.6%
+Epoch 03/3  train 1.8378 (v 0.0344 p 1.8034)  |  val 2.0998 (v 0.0369 p 2.0630)  mae 7.95  top3/5 75.3%/86.0%
+
+Training complete. Best val loss 2.0650. Checkpoints in runs/run_06/models/iter3
+
+[Step 4/4] Evaluating candidate (M3) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M3.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   17 (17.0%)
+Draws:  15 (15.0%)
+Losses: 68 (68.0%)
+Score:  0.245 (24.5%)
+Estimated ELO difference vs SF L3: -196
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M3): 0.245 (24.5%)
+  Improvement:       +0.000 (0.0%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M3 (no reset)
+
+⏱  Iteration 3: play 332s · label 549s · mix 110s · train 40s · eval 52s · total 1087s (18.1 min)
+
+================================================================================
+ITERATION 4/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M3.pth
+  Output: runs/run_06/data/iter4_raw.csv
+  Self-play PGN: runs/run_06/games/iter4.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11589 positions
+  [play] 200/1000 games done | 22481 positions
+  [play] 300/1000 games done | 33876 positions
+  [play] 400/1000 games done | 46021 positions
+  [play] 500/1000 games done | 58081 positions
+  [play] 600/1000 games done | 69055 positions
+  [play] 700/1000 games done | 81326 positions
+  [play] 800/1000 games done | 93658 positions
+  [play] 900/1000 games done | 106230 positions
+  [play] 1000/1000 games done | 118306 positions
+  Collected 118306 positions (114485 unique) from 1000 games in 334.3s
+  Average plies per game: 118.3
+  Saved 1000 self-play games to runs/run_06/games/iter4.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1432/114485 positions | 129s elapsed | ~11 pos/s | ETA ~10149s
+  [label] 2/80 batches | 2864/114485 positions | 131s elapsed | ~22 pos/s | ETA ~5099s
+  [label] 3/80 batches | 4296/114485 positions | 132s elapsed | ~33 pos/s | ETA ~3385s
+  [label] 4/80 batches | 5728/114485 positions | 132s elapsed | ~43 pos/s | ETA ~2507s
+  [label] 5/80 batches | 7160/114485 positions | 133s elapsed | ~54 pos/s | ETA ~1990s
+  [label] 6/80 batches | 8592/114485 positions | 133s elapsed | ~64 pos/s | ETA ~1645s
+  [label] 7/80 batches | 10024/114485 positions | 135s elapsed | ~74 pos/s | ETA ~1403s
+  [label] 8/80 batches | 11456/114485 positions | 135s elapsed | ~85 pos/s | ETA ~1212s
+  [label] 9/80 batches | 12888/114485 positions | 136s elapsed | ~95 pos/s | ETA ~1070s
+  [label] 10/80 batches | 14320/114485 positions | 136s elapsed | ~105 pos/s | ETA ~950s
+  [label] 11/80 batches | 15752/114485 positions | 137s elapsed | ~115 pos/s | ETA ~856s
+  [label] 12/80 batches | 17184/114485 positions | 137s elapsed | ~125 pos/s | ETA ~777s
+  [label] 13/80 batches | 18616/114485 positions | 137s elapsed | ~136 pos/s | ETA ~707s
+  [label] 14/80 batches | 20048/114485 positions | 138s elapsed | ~146 pos/s | ETA ~649s
+  [label] 15/80 batches | 21480/114485 positions | 138s elapsed | ~156 pos/s | ETA ~597s
+  [label] 16/80 batches | 22912/114485 positions | 139s elapsed | ~165 pos/s | ETA ~555s
+  [label] 17/80 batches | 24344/114485 positions | 139s elapsed | ~175 pos/s | ETA ~516s
+  [label] 18/80 batches | 25776/114485 positions | 140s elapsed | ~185 pos/s | ETA ~480s
+  [label] 19/80 batches | 27208/114485 positions | 141s elapsed | ~194 pos/s | ETA ~451s
+  [label] 20/80 batches | 28640/114485 positions | 143s elapsed | ~201 pos/s | ETA ~427s
+  [label] 21/80 batches | 30072/114485 positions | 257s elapsed | ~117 pos/s | ETA ~723s
+  [label] 22/80 batches | 31504/114485 positions | 261s elapsed | ~121 pos/s | ETA ~687s
+  [label] 23/80 batches | 32936/114485 positions | 267s elapsed | ~123 pos/s | ETA ~662s
+  [label] 24/80 batches | 34368/114485 positions | 268s elapsed | ~128 pos/s | ETA ~625s
+  [label] 25/80 batches | 35800/114485 positions | 269s elapsed | ~133 pos/s | ETA ~591s
+  [label] 26/80 batches | 37232/114485 positions | 269s elapsed | ~138 pos/s | ETA ~558s
+  [label] 27/80 batches | 38664/114485 positions | 269s elapsed | ~144 pos/s | ETA ~528s
+  [label] 28/80 batches | 40096/114485 positions | 270s elapsed | ~149 pos/s | ETA ~500s
+  [label] 29/80 batches | 41528/114485 positions | 270s elapsed | ~154 pos/s | ETA ~474s
+  [label] 30/80 batches | 42960/114485 positions | 271s elapsed | ~159 pos/s | ETA ~451s
+  [label] 31/80 batches | 44392/114485 positions | 271s elapsed | ~164 pos/s | ETA ~428s
+  [label] 32/80 batches | 45824/114485 positions | 271s elapsed | ~169 pos/s | ETA ~407s
+  [label] 33/80 batches | 47256/114485 positions | 272s elapsed | ~174 pos/s | ETA ~387s
+  [label] 34/80 batches | 48688/114485 positions | 274s elapsed | ~178 pos/s | ETA ~370s
+  [label] 35/80 batches | 50120/114485 positions | 274s elapsed | ~183 pos/s | ETA ~352s
+  [label] 36/80 batches | 51552/114485 positions | 275s elapsed | ~188 pos/s | ETA ~336s
+  [label] 37/80 batches | 52984/114485 positions | 276s elapsed | ~192 pos/s | ETA ~320s
+  [label] 38/80 batches | 54416/114485 positions | 278s elapsed | ~196 pos/s | ETA ~307s
+  [label] 39/80 batches | 55848/114485 positions | 278s elapsed | ~201 pos/s | ETA ~292s
+  [label] 40/80 batches | 57280/114485 positions | 282s elapsed | ~203 pos/s | ETA ~282s
+  [label] 41/80 batches | 58712/114485 positions | 390s elapsed | ~151 pos/s | ETA ~370s
+  [label] 42/80 batches | 60144/114485 positions | 398s elapsed | ~151 pos/s | ETA ~359s
+  [label] 43/80 batches | 61576/114485 positions | 399s elapsed | ~154 pos/s | ETA ~343s
+  [label] 44/80 batches | 63008/114485 positions | 400s elapsed | ~158 pos/s | ETA ~326s
+  [label] 45/80 batches | 64440/114485 positions | 401s elapsed | ~161 pos/s | ETA ~311s
+  [label] 46/80 batches | 65872/114485 positions | 401s elapsed | ~164 pos/s | ETA ~296s
+  [label] 47/80 batches | 67304/114485 positions | 401s elapsed | ~168 pos/s | ETA ~281s
+  [label] 48/80 batches | 68736/114485 positions | 403s elapsed | ~171 pos/s | ETA ~268s
+  [label] 49/80 batches | 70168/114485 positions | 403s elapsed | ~174 pos/s | ETA ~254s
+  [label] 50/80 batches | 71600/114485 positions | 403s elapsed | ~178 pos/s | ETA ~241s
+  [label] 51/80 batches | 73032/114485 positions | 403s elapsed | ~181 pos/s | ETA ~229s
+  [label] 52/80 batches | 74464/114485 positions | 404s elapsed | ~184 pos/s | ETA ~217s
+  [label] 53/80 batches | 75896/114485 positions | 406s elapsed | ~187 pos/s | ETA ~206s
+  [label] 54/80 batches | 77328/114485 positions | 406s elapsed | ~190 pos/s | ETA ~195s
+  [label] 55/80 batches | 78760/114485 positions | 406s elapsed | ~194 pos/s | ETA ~184s
+  [label] 56/80 batches | 80192/114485 positions | 407s elapsed | ~197 pos/s | ETA ~174s
+  [label] 57/80 batches | 81624/114485 positions | 408s elapsed | ~200 pos/s | ETA ~164s
+  [label] 58/80 batches | 83056/114485 positions | 414s elapsed | ~201 pos/s | ETA ~157s
+  [label] 59/80 batches | 84488/114485 positions | 415s elapsed | ~204 pos/s | ETA ~147s
+  [label] 60/80 batches | 85920/114485 positions | 418s elapsed | ~206 pos/s | ETA ~139s
+  [label] 61/80 batches | 87352/114485 positions | 522s elapsed | ~167 pos/s | ETA ~162s
+  [label] 62/80 batches | 88784/114485 positions | 524s elapsed | ~169 pos/s | ETA ~152s
+  [label] 63/80 batches | 90216/114485 positions | 526s elapsed | ~172 pos/s | ETA ~141s
+  [label] 64/80 batches | 91648/114485 positions | 533s elapsed | ~172 pos/s | ETA ~133s
+  [label] 65/80 batches | 93080/114485 positions | 534s elapsed | ~174 pos/s | ETA ~123s
+  [label] 66/80 batches | 94512/114485 positions | 534s elapsed | ~177 pos/s | ETA ~113s
+  [label] 67/80 batches | 95944/114485 positions | 535s elapsed | ~179 pos/s | ETA ~103s
+  [label] 68/80 batches | 97376/114485 positions | 535s elapsed | ~182 pos/s | ETA ~94s
+  [label] 69/80 batches | 98808/114485 positions | 535s elapsed | ~185 pos/s | ETA ~85s
+  [label] 70/80 batches | 100240/114485 positions | 536s elapsed | ~187 pos/s | ETA ~76s
+  [label] 71/80 batches | 101672/114485 positions | 537s elapsed | ~189 pos/s | ETA ~68s
+  [label] 72/80 batches | 103104/114485 positions | 537s elapsed | ~192 pos/s | ETA ~59s
+  [label] 73/80 batches | 104536/114485 positions | 541s elapsed | ~193 pos/s | ETA ~52s
+  [label] 74/80 batches | 105968/114485 positions | 542s elapsed | ~195 pos/s | ETA ~44s
+  [label] 75/80 batches | 107400/114485 positions | 542s elapsed | ~198 pos/s | ETA ~36s
+  [label] 76/80 batches | 108832/114485 positions | 542s elapsed | ~201 pos/s | ETA ~28s
+  [label] 77/80 batches | 110264/114485 positions | 543s elapsed | ~203 pos/s | ETA ~21s
+  [label] 78/80 batches | 111696/114485 positions | 543s elapsed | ~206 pos/s | ETA ~14s
+  [label] 79/80 batches | 113053/114485 positions | 549s elapsed | ~206 pos/s | ETA ~7s
+  [label] 80/80 batches | 114485/114485 positions | 552s elapsed | ~208 pos/s | ETA ~0s
+Labeled 114485 positions in 552.6s
+
+Step 3: writing runs/run_06/data/iter4_raw.csv...
+Saved 114485 training examples to runs/run_06/data/iter4_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.12  std 45.97  min -99.99  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter4_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 114485 examples
+  Sampled foundation: 49065 examples
+  Mixed total: 163550 examples
+  Train: 147195 examples
+  Val: 16355 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter4_train.csv
+✓ Saved val to: runs/run_06/data/iter4_val.csv
+
+Final statistics:
+  Train - Foundation: 44283 (30.1%)
+  Train - New: 102912 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter4_train.csv
+Val data:     runs/run_06/data/iter4_val.csv
+Initial model:runs/run_06/models/model_M3.pth
+Output dir:   runs/run_06/models/iter4
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter4_train.csv...
+Precomputing 147,195 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 147,195 / 147,195 positions...
+Done. Board tensors shape: torch.Size([147195, 18, 8, 8])
+Policy indices shape: torch.Size([147195, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([147195, 128]) (sparse, ~37.7 MB)
+Positions with policy targets: 138,935 / 147,195 (94.4%)
+Loading runs/run_06/data/iter4_val.csv...
+Precomputing 16,355 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,355 / 16,355 positions...
+Done. Board tensors shape: torch.Size([16355, 18, 8, 8])
+Policy indices shape: torch.Size([16355, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16355, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,404 / 16,355 (94.2%)
+Train batches: 575  Val batches: 64
+Loading weights from runs/run_06/models/model_M3.pth
+Epoch 01/3  train 2.0207 (v 0.0407 p 1.9800)  |  val 2.0887 (v 0.0584 p 2.0303)  mae 8.82  top3/5 76.9%/87.1%
+  -> new best (val loss 2.0887)
+Epoch 02/3  train 1.9088 (v 0.0354 p 1.8734)  |  val 2.0806 (v 0.0403 p 2.0403)  mae 8.95  top3/5 76.2%/86.7%
+  -> new best (val loss 2.0806)
+Epoch 03/3  train 1.8359 (v 0.0335 p 1.8024)  |  val 2.0987 (v 0.0397 p 2.0589)  mae 8.69  top3/5 75.6%/86.2%
+
+Training complete. Best val loss 2.0806. Checkpoints in runs/run_06/models/iter4
+
+[Step 4/4] Evaluating candidate (M4) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M4.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   10 (10.0%)
+Draws:  10 (10.0%)
+Losses: 80 (80.0%)
+Score:  0.150 (15.0%)
+Estimated ELO difference vs SF L3: -301
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M4): 0.150 (15.0%)
+  Improvement:       -0.095 (-9.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M4 (no reset)
+
+⏱  Iteration 4: play 334s · label 553s · mix 109s · train 41s · eval 52s · total 1093s (18.2 min)
+
+================================================================================
+ITERATION 5/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M4.pth
+  Output: runs/run_06/data/iter5_raw.csv
+  Self-play PGN: runs/run_06/games/iter5.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 10817 positions
+  [play] 200/1000 games done | 22657 positions
+  [play] 300/1000 games done | 35296 positions
+  [play] 400/1000 games done | 46751 positions
+  [play] 500/1000 games done | 58246 positions
+  [play] 600/1000 games done | 70626 positions
+  [play] 700/1000 games done | 81956 positions
+  [play] 800/1000 games done | 93480 positions
+  [play] 900/1000 games done | 106185 positions
+  [play] 1000/1000 games done | 118175 positions
+  Collected 118175 positions (114427 unique) from 1000 games in 331.5s
+  Average plies per game: 118.2
+  Saved 1000 self-play games to runs/run_06/games/iter5.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1431/114427 positions | 129s elapsed | ~11 pos/s | ETA ~10163s
+  [label] 2/80 batches | 2862/114427 positions | 129s elapsed | ~22 pos/s | ETA ~5021s
+  [label] 3/80 batches | 4293/114427 positions | 130s elapsed | ~33 pos/s | ETA ~3325s
+  [label] 4/80 batches | 5724/114427 positions | 130s elapsed | ~44 pos/s | ETA ~2476s
+  [label] 5/80 batches | 7155/114427 positions | 131s elapsed | ~55 pos/s | ETA ~1965s
+  [label] 6/80 batches | 8586/114427 positions | 131s elapsed | ~65 pos/s | ETA ~1618s
+  [label] 7/80 batches | 10017/114427 positions | 131s elapsed | ~76 pos/s | ETA ~1370s
+  [label] 8/80 batches | 11448/114427 positions | 132s elapsed | ~87 pos/s | ETA ~1184s
+  [label] 9/80 batches | 12879/114427 positions | 132s elapsed | ~98 pos/s | ETA ~1038s
+  [label] 10/80 batches | 14310/114427 positions | 132s elapsed | ~108 pos/s | ETA ~927s
+  [label] 11/80 batches | 15741/114427 positions | 133s elapsed | ~118 pos/s | ETA ~835s
+  [label] 12/80 batches | 17172/114427 positions | 135s elapsed | ~127 pos/s | ETA ~763s
+  [label] 13/80 batches | 18603/114427 positions | 135s elapsed | ~138 pos/s | ETA ~695s
+  [label] 14/80 batches | 20034/114427 positions | 136s elapsed | ~147 pos/s | ETA ~641s
+  [label] 15/80 batches | 21465/114427 positions | 138s elapsed | ~156 pos/s | ETA ~596s
+  [label] 16/80 batches | 22896/114427 positions | 138s elapsed | ~166 pos/s | ETA ~551s
+  [label] 17/80 batches | 24327/114427 positions | 138s elapsed | ~176 pos/s | ETA ~512s
+  [label] 18/80 batches | 25758/114427 positions | 139s elapsed | ~186 pos/s | ETA ~477s
+  [label] 19/80 batches | 27189/114427 positions | 140s elapsed | ~195 pos/s | ETA ~448s
+  [label] 20/80 batches | 28620/114427 positions | 142s elapsed | ~202 pos/s | ETA ~425s
+  [label] 21/80 batches | 30051/114427 positions | 262s elapsed | ~115 pos/s | ETA ~736s
+  [label] 22/80 batches | 31482/114427 positions | 265s elapsed | ~119 pos/s | ETA ~699s
+  [label] 23/80 batches | 32913/114427 positions | 266s elapsed | ~124 pos/s | ETA ~659s
+  [label] 24/80 batches | 34344/114427 positions | 268s elapsed | ~128 pos/s | ETA ~624s
+  [label] 25/80 batches | 35775/114427 positions | 268s elapsed | ~133 pos/s | ETA ~589s
+  [label] 26/80 batches | 37206/114427 positions | 269s elapsed | ~139 pos/s | ETA ~558s
+  [label] 27/80 batches | 38637/114427 positions | 269s elapsed | ~144 pos/s | ETA ~527s
+  [label] 28/80 batches | 40068/114427 positions | 269s elapsed | ~149 pos/s | ETA ~499s
+  [label] 29/80 batches | 41499/114427 positions | 270s elapsed | ~153 pos/s | ETA ~475s
+  [label] 30/80 batches | 42930/114427 positions | 271s elapsed | ~159 pos/s | ETA ~451s
+  [label] 31/80 batches | 44361/114427 positions | 271s elapsed | ~164 pos/s | ETA ~428s
+  [label] 32/80 batches | 45792/114427 positions | 271s elapsed | ~169 pos/s | ETA ~407s
+  [label] 33/80 batches | 47223/114427 positions | 272s elapsed | ~174 pos/s | ETA ~387s
+  [label] 34/80 batches | 48654/114427 positions | 272s elapsed | ~179 pos/s | ETA ~367s
+  [label] 35/80 batches | 50085/114427 positions | 272s elapsed | ~184 pos/s | ETA ~350s
+  [label] 36/80 batches | 51516/114427 positions | 272s elapsed | ~189 pos/s | ETA ~332s
+  [label] 37/80 batches | 52947/114427 positions | 273s elapsed | ~194 pos/s | ETA ~317s
+  [label] 38/80 batches | 54378/114427 positions | 273s elapsed | ~199 pos/s | ETA ~302s
+  [label] 39/80 batches | 55809/114427 positions | 276s elapsed | ~202 pos/s | ETA ~290s
+  [label] 40/80 batches | 57240/114427 positions | 279s elapsed | ~205 pos/s | ETA ~279s
+  [label] 41/80 batches | 58671/114427 positions | 394s elapsed | ~149 pos/s | ETA ~374s
+  [label] 42/80 batches | 60102/114427 positions | 396s elapsed | ~152 pos/s | ETA ~358s
+  [label] 43/80 batches | 61533/114427 positions | 398s elapsed | ~154 pos/s | ETA ~343s
+  [label] 44/80 batches | 62964/114427 positions | 399s elapsed | ~158 pos/s | ETA ~326s
+  [label] 45/80 batches | 64395/114427 positions | 401s elapsed | ~160 pos/s | ETA ~312s
+  [label] 46/80 batches | 65826/114427 positions | 403s elapsed | ~163 pos/s | ETA ~297s
+  [label] 47/80 batches | 67257/114427 positions | 403s elapsed | ~167 pos/s | ETA ~283s
+  [label] 48/80 batches | 68688/114427 positions | 404s elapsed | ~170 pos/s | ETA ~269s
+  [label] 49/80 batches | 70119/114427 positions | 404s elapsed | ~174 pos/s | ETA ~255s
+  [label] 50/80 batches | 71550/114427 positions | 405s elapsed | ~177 pos/s | ETA ~242s
+  [label] 51/80 batches | 72981/114427 positions | 405s elapsed | ~180 pos/s | ETA ~230s
+  [label] 52/80 batches | 74412/114427 positions | 406s elapsed | ~183 pos/s | ETA ~218s
+  [label] 53/80 batches | 75843/114427 positions | 406s elapsed | ~187 pos/s | ETA ~207s
+  [label] 54/80 batches | 77274/114427 positions | 408s elapsed | ~190 pos/s | ETA ~196s
+  [label] 55/80 batches | 78705/114427 positions | 408s elapsed | ~193 pos/s | ETA ~185s
+  [label] 56/80 batches | 80136/114427 positions | 408s elapsed | ~196 pos/s | ETA ~175s
+  [label] 57/80 batches | 81567/114427 positions | 410s elapsed | ~199 pos/s | ETA ~165s
+  [label] 58/80 batches | 82998/114427 positions | 412s elapsed | ~202 pos/s | ETA ~156s
+  [label] 59/80 batches | 84429/114427 positions | 412s elapsed | ~205 pos/s | ETA ~146s
+  [label] 60/80 batches | 85860/114427 positions | 413s elapsed | ~208 pos/s | ETA ~137s
+  [label] 61/80 batches | 87291/114427 positions | 529s elapsed | ~165 pos/s | ETA ~164s
+  [label] 62/80 batches | 88722/114427 positions | 530s elapsed | ~167 pos/s | ETA ~154s
+  [label] 63/80 batches | 90153/114427 positions | 533s elapsed | ~169 pos/s | ETA ~143s
+  [label] 64/80 batches | 91584/114427 positions | 533s elapsed | ~172 pos/s | ETA ~133s
+  [label] 65/80 batches | 93015/114427 positions | 534s elapsed | ~174 pos/s | ETA ~123s
+  [label] 66/80 batches | 94446/114427 positions | 536s elapsed | ~176 pos/s | ETA ~113s
+  [label] 67/80 batches | 95877/114427 positions | 536s elapsed | ~179 pos/s | ETA ~104s
+  [label] 68/80 batches | 97308/114427 positions | 536s elapsed | ~181 pos/s | ETA ~94s
+  [label] 69/80 batches | 98739/114427 positions | 536s elapsed | ~184 pos/s | ETA ~85s
+  [label] 70/80 batches | 100170/114427 positions | 537s elapsed | ~187 pos/s | ETA ~76s
+  [label] 71/80 batches | 101601/114427 positions | 539s elapsed | ~189 pos/s | ETA ~68s
+  [label] 72/80 batches | 103032/114427 positions | 541s elapsed | ~190 pos/s | ETA ~60s
+  [label] 73/80 batches | 104463/114427 positions | 541s elapsed | ~193 pos/s | ETA ~52s
+  [label] 74/80 batches | 105894/114427 positions | 541s elapsed | ~196 pos/s | ETA ~44s
+  [label] 75/80 batches | 107272/114427 positions | 542s elapsed | ~198 pos/s | ETA ~36s
+  [label] 76/80 batches | 108703/114427 positions | 544s elapsed | ~200 pos/s | ETA ~29s
+  [label] 77/80 batches | 110134/114427 positions | 544s elapsed | ~202 pos/s | ETA ~21s
+  [label] 78/80 batches | 111565/114427 positions | 545s elapsed | ~205 pos/s | ETA ~14s
+  [label] 79/80 batches | 112996/114427 positions | 545s elapsed | ~207 pos/s | ETA ~7s
+  [label] 80/80 batches | 114427/114427 positions | 547s elapsed | ~209 pos/s | ETA ~0s
+Labeled 114427 positions in 548.5s
+
+Step 3: writing runs/run_06/data/iter5_raw.csv...
+Saved 114427 training examples to runs/run_06/data/iter5_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.09  std 45.98  min -99.99  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter5_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 114427 examples
+  Sampled foundation: 49040 examples
+  Mixed total: 163467 examples
+  Train: 147120 examples
+  Val: 16347 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter5_train.csv
+✓ Saved val to: runs/run_06/data/iter5_val.csv
+
+Final statistics:
+  Train - Foundation: 44263 (30.1%)
+  Train - New: 102857 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter5_train.csv
+Val data:     runs/run_06/data/iter5_val.csv
+Initial model:runs/run_06/models/model_M4.pth
+Output dir:   runs/run_06/models/iter5
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter5_train.csv...
+Precomputing 147,120 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 147,120 / 147,120 positions...
+Done. Board tensors shape: torch.Size([147120, 18, 8, 8])
+Policy indices shape: torch.Size([147120, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([147120, 128]) (sparse, ~37.7 MB)
+Positions with policy targets: 138,831 / 147,120 (94.4%)
+Loading runs/run_06/data/iter5_val.csv...
+Precomputing 16,347 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,347 / 16,347 positions...
+Done. Board tensors shape: torch.Size([16347, 18, 8, 8])
+Policy indices shape: torch.Size([16347, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16347, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,410 / 16,347 (94.3%)
+Train batches: 575  Val batches: 64
+Loading weights from runs/run_06/models/model_M4.pth
+Epoch 01/3  train 2.0015 (v 0.0403 p 1.9613)  |  val 2.0913 (v 0.0485 p 2.0428)  mae 8.86  top3/5 76.5%/86.6%
+  -> new best (val loss 2.0913)
+Epoch 02/3  train 1.8901 (v 0.0355 p 1.8546)  |  val 2.0910 (v 0.0408 p 2.0501)  mae 9.01  top3/5 76.1%/86.6%
+  -> new best (val loss 2.0910)
+Epoch 03/3  train 1.8171 (v 0.0325 p 1.7846)  |  val 2.1193 (v 0.0457 p 2.0736)  mae 9.00  top3/5 75.2%/86.1%
+
+Training complete. Best val loss 2.0910. Checkpoints in runs/run_06/models/iter5
+
+[Step 4/4] Evaluating candidate (M5) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M5.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   13 (13.0%)
+Draws:  10 (10.0%)
+Losses: 77 (77.0%)
+Score:  0.180 (18.0%)
+Estimated ELO difference vs SF L3: -263
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M5): 0.180 (18.0%)
+  Improvement:       -0.065 (-6.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M5 (no reset)
+
+⏱  Iteration 5: play 331s · label 548s · mix 104s · train 41s · eval 48s · total 1077s (18.0 min)
+
+================================================================================
+ITERATION 6/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M5.pth
+  Output: runs/run_06/data/iter6_raw.csv
+  Self-play PGN: runs/run_06/games/iter6.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11286 positions
+  [play] 200/1000 games done | 22362 positions
+  [play] 300/1000 games done | 33877 positions
+  [play] 400/1000 games done | 45717 positions
+  [play] 500/1000 games done | 57527 positions
+  [play] 600/1000 games done | 69251 positions
+  [play] 700/1000 games done | 81035 positions
+  [play] 800/1000 games done | 92983 positions
+  [play] 900/1000 games done | 105289 positions
+  [play] 1000/1000 games done | 117256 positions
+  Collected 117256 positions (113512 unique) from 1000 games in 331.5s
+  Average plies per game: 117.3
+  Saved 1000 self-play games to runs/run_06/games/iter6.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1419/113512 positions | 127s elapsed | ~11 pos/s | ETA ~10050s
+  [label] 2/80 batches | 2838/113512 positions | 129s elapsed | ~22 pos/s | ETA ~5019s
+  [label] 3/80 batches | 4257/113512 positions | 129s elapsed | ~33 pos/s | ETA ~3305s
+  [label] 4/80 batches | 5676/113512 positions | 132s elapsed | ~43 pos/s | ETA ~2517s
+  [label] 5/80 batches | 7095/113512 positions | 133s elapsed | ~53 pos/s | ETA ~1993s
+  [label] 6/80 batches | 8514/113512 positions | 134s elapsed | ~64 pos/s | ETA ~1650s
+  [label] 7/80 batches | 9933/113512 positions | 134s elapsed | ~74 pos/s | ETA ~1397s
+  [label] 8/80 batches | 11352/113512 positions | 134s elapsed | ~84 pos/s | ETA ~1209s
+  [label] 9/80 batches | 12771/113512 positions | 135s elapsed | ~94 pos/s | ETA ~1068s
+  [label] 10/80 batches | 14190/113512 positions | 135s elapsed | ~105 pos/s | ETA ~948s
+  [label] 11/80 batches | 15609/113512 positions | 136s elapsed | ~115 pos/s | ETA ~853s
+  [label] 12/80 batches | 17028/113512 positions | 136s elapsed | ~125 pos/s | ETA ~773s
+  [label] 13/80 batches | 18447/113512 positions | 136s elapsed | ~135 pos/s | ETA ~703s
+  [label] 14/80 batches | 19866/113512 positions | 137s elapsed | ~145 pos/s | ETA ~644s
+  [label] 15/80 batches | 21285/113512 positions | 138s elapsed | ~154 pos/s | ETA ~598s
+  [label] 16/80 batches | 22704/113512 positions | 139s elapsed | ~164 pos/s | ETA ~555s
+  [label] 17/80 batches | 24123/113512 positions | 139s elapsed | ~174 pos/s | ETA ~515s
+  [label] 18/80 batches | 25542/113512 positions | 139s elapsed | ~183 pos/s | ETA ~480s
+  [label] 19/80 batches | 26961/113512 positions | 139s elapsed | ~193 pos/s | ETA ~447s
+  [label] 20/80 batches | 28380/113512 positions | 141s elapsed | ~202 pos/s | ETA ~422s
+  [label] 21/80 batches | 29799/113512 positions | 259s elapsed | ~115 pos/s | ETA ~727s
+  [label] 22/80 batches | 31218/113512 positions | 259s elapsed | ~121 pos/s | ETA ~683s
+  [label] 23/80 batches | 32637/113512 positions | 260s elapsed | ~125 pos/s | ETA ~645s
+  [label] 24/80 batches | 34056/113512 positions | 262s elapsed | ~130 pos/s | ETA ~610s
+  [label] 25/80 batches | 35475/113512 positions | 265s elapsed | ~134 pos/s | ETA ~583s
+  [label] 26/80 batches | 36894/113512 positions | 266s elapsed | ~139 pos/s | ETA ~552s
+  [label] 27/80 batches | 38313/113512 positions | 267s elapsed | ~144 pos/s | ETA ~523s
+  [label] 28/80 batches | 39732/113512 positions | 267s elapsed | ~149 pos/s | ETA ~495s
+  [label] 29/80 batches | 41151/113512 positions | 267s elapsed | ~154 pos/s | ETA ~469s
+  [label] 30/80 batches | 42570/113512 positions | 267s elapsed | ~159 pos/s | ETA ~446s
+  [label] 31/80 batches | 43989/113512 positions | 268s elapsed | ~164 pos/s | ETA ~423s
+  [label] 32/80 batches | 45408/113512 positions | 268s elapsed | ~169 pos/s | ETA ~402s
+  [label] 33/80 batches | 46827/113512 positions | 268s elapsed | ~175 pos/s | ETA ~382s
+  [label] 34/80 batches | 48246/113512 positions | 268s elapsed | ~180 pos/s | ETA ~363s
+  [label] 35/80 batches | 49665/113512 positions | 271s elapsed | ~184 pos/s | ETA ~348s
+  [label] 36/80 batches | 51084/113512 positions | 274s elapsed | ~187 pos/s | ETA ~334s
+  [label] 37/80 batches | 52503/113512 positions | 274s elapsed | ~192 pos/s | ETA ~318s
+  [label] 38/80 batches | 53922/113512 positions | 275s elapsed | ~196 pos/s | ETA ~304s
+  [label] 39/80 batches | 55341/113512 positions | 275s elapsed | ~201 pos/s | ETA ~290s
+  [label] 40/80 batches | 56760/113512 positions | 276s elapsed | ~206 pos/s | ETA ~275s
+  [label] 41/80 batches | 58179/113512 positions | 391s elapsed | ~149 pos/s | ETA ~372s
+  [label] 42/80 batches | 59598/113512 positions | 391s elapsed | ~152 pos/s | ETA ~354s
+  [label] 43/80 batches | 61017/113512 positions | 393s elapsed | ~155 pos/s | ETA ~338s
+  [label] 44/80 batches | 62436/113512 positions | 394s elapsed | ~158 pos/s | ETA ~323s
+  [label] 45/80 batches | 63855/113512 positions | 395s elapsed | ~162 pos/s | ETA ~307s
+  [label] 46/80 batches | 65274/113512 positions | 396s elapsed | ~165 pos/s | ETA ~293s
+  [label] 47/80 batches | 66693/113512 positions | 399s elapsed | ~167 pos/s | ETA ~280s
+  [label] 48/80 batches | 68112/113512 positions | 399s elapsed | ~171 pos/s | ETA ~266s
+  [label] 49/80 batches | 69531/113512 positions | 400s elapsed | ~174 pos/s | ETA ~253s
+  [label] 50/80 batches | 70950/113512 positions | 401s elapsed | ~177 pos/s | ETA ~241s
+  [label] 51/80 batches | 72369/113512 positions | 402s elapsed | ~180 pos/s | ETA ~228s
+  [label] 52/80 batches | 73788/113512 positions | 402s elapsed | ~184 pos/s | ETA ~216s
+  [label] 53/80 batches | 75207/113512 positions | 402s elapsed | ~187 pos/s | ETA ~205s
+  [label] 54/80 batches | 76626/113512 positions | 403s elapsed | ~190 pos/s | ETA ~194s
+  [label] 55/80 batches | 78045/113512 positions | 404s elapsed | ~193 pos/s | ETA ~183s
+  [label] 56/80 batches | 79464/113512 positions | 404s elapsed | ~196 pos/s | ETA ~173s
+  [label] 57/80 batches | 80883/113512 positions | 407s elapsed | ~199 pos/s | ETA ~164s
+  [label] 58/80 batches | 82302/113512 positions | 407s elapsed | ~202 pos/s | ETA ~154s
+  [label] 59/80 batches | 83721/113512 positions | 408s elapsed | ~205 pos/s | ETA ~145s
+  [label] 60/80 batches | 85140/113512 positions | 415s elapsed | ~205 pos/s | ETA ~138s
+  [label] 61/80 batches | 86559/113512 positions | 515s elapsed | ~168 pos/s | ETA ~160s
+  [label] 62/80 batches | 87978/113512 positions | 523s elapsed | ~168 pos/s | ETA ~152s
+  [label] 63/80 batches | 89397/113512 positions | 525s elapsed | ~170 pos/s | ETA ~142s
+  [label] 64/80 batches | 90816/113512 positions | 525s elapsed | ~173 pos/s | ETA ~131s
+  [label] 65/80 batches | 92235/113512 positions | 525s elapsed | ~176 pos/s | ETA ~121s
+  [label] 66/80 batches | 93654/113512 positions | 533s elapsed | ~176 pos/s | ETA ~113s
+  [label] 67/80 batches | 95073/113512 positions | 534s elapsed | ~178 pos/s | ETA ~103s
+  [label] 68/80 batches | 96492/113512 positions | 534s elapsed | ~181 pos/s | ETA ~94s
+  [label] 69/80 batches | 97911/113512 positions | 535s elapsed | ~183 pos/s | ETA ~85s
+  [label] 70/80 batches | 99330/113512 positions | 535s elapsed | ~186 pos/s | ETA ~76s
+  [label] 71/80 batches | 100749/113512 positions | 536s elapsed | ~188 pos/s | ETA ~68s
+  [label] 72/80 batches | 102168/113512 positions | 537s elapsed | ~190 pos/s | ETA ~60s
+  [label] 73/80 batches | 103587/113512 positions | 538s elapsed | ~192 pos/s | ETA ~52s
+  [label] 74/80 batches | 105006/113512 positions | 539s elapsed | ~195 pos/s | ETA ~44s
+  [label] 75/80 batches | 106425/113512 positions | 540s elapsed | ~197 pos/s | ETA ~36s
+  [label] 76/80 batches | 107844/113512 positions | 540s elapsed | ~200 pos/s | ETA ~28s
+  [label] 77/80 batches | 109263/113512 positions | 540s elapsed | ~202 pos/s | ETA ~21s
+  [label] 78/80 batches | 110682/113512 positions | 540s elapsed | ~205 pos/s | ETA ~14s
+  [label] 79/80 batches | 112101/113512 positions | 542s elapsed | ~207 pos/s | ETA ~7s
+  [label] 80/80 batches | 113512/113512 positions | 544s elapsed | ~209 pos/s | ETA ~0s
+Labeled 113512 positions in 545.2s
+
+Step 3: writing runs/run_06/data/iter6_raw.csv...
+Saved 113512 training examples to runs/run_06/data/iter6_raw.csv
+
+Eval column (white pov, pawns):
+  mean -1.31  std 45.51  min -99.99  max 100.00
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter6_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 113512 examples
+  Sampled foundation: 48648 examples
+  Mixed total: 162160 examples
+  Train: 145944 examples
+  Val: 16216 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter6_train.csv
+✓ Saved val to: runs/run_06/data/iter6_val.csv
+
+Final statistics:
+  Train - Foundation: 43915 (30.1%)
+  Train - New: 102029 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter6_train.csv
+Val data:     runs/run_06/data/iter6_val.csv
+Initial model:runs/run_06/models/model_M5.pth
+Output dir:   runs/run_06/models/iter6
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter6_train.csv...
+Precomputing 145,944 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 145,944 / 145,944 positions...
+Done. Board tensors shape: torch.Size([145944, 18, 8, 8])
+Policy indices shape: torch.Size([145944, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([145944, 128]) (sparse, ~37.4 MB)
+Positions with policy targets: 137,837 / 145,944 (94.4%)
+Loading runs/run_06/data/iter6_val.csv...
+Precomputing 16,216 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,216 / 16,216 positions...
+Done. Board tensors shape: torch.Size([16216, 18, 8, 8])
+Policy indices shape: torch.Size([16216, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16216, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,319 / 16,216 (94.5%)
+Train batches: 571  Val batches: 64
+Loading weights from runs/run_06/models/model_M5.pth
+Epoch 01/3  train 1.9891 (v 0.0404 p 1.9488)  |  val 2.0842 (v 0.0405 p 2.0437)  mae 7.58  top3/5 76.8%/86.6%
+  -> new best (val loss 2.0842)
+Epoch 02/3  train 1.8777 (v 0.0356 p 1.8421)  |  val 2.1079 (v 0.0471 p 2.0608)  mae 7.97  top3/5 75.9%/86.7%
+Epoch 03/3  train 1.8051 (v 0.0325 p 1.7726)  |  val 2.1170 (v 0.0394 p 2.0776)  mae 8.08  top3/5 75.9%/86.2%
+
+Training complete. Best val loss 2.0842. Checkpoints in runs/run_06/models/iter6
+
+[Step 4/4] Evaluating candidate (M6) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M6.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   7 (7.0%)
+Draws:  12 (12.0%)
+Losses: 81 (81.0%)
+Score:  0.130 (13.0%)
+Estimated ELO difference vs SF L3: -330
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M6): 0.130 (13.0%)
+  Improvement:       -0.115 (-11.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M6 (no reset)
+
+⏱  Iteration 6: play 332s · label 545s · mix 112s · train 46s · eval 56s · total 1094s (18.2 min)
+
+================================================================================
+ITERATION 7/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M6.pth
+  Output: runs/run_06/data/iter7_raw.csv
+  Self-play PGN: runs/run_06/games/iter7.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 12355 positions
+  [play] 200/1000 games done | 24487 positions
+  [play] 300/1000 games done | 35904 positions
+  [play] 400/1000 games done | 46872 positions
+  [play] 500/1000 games done | 58452 positions
+  [play] 600/1000 games done | 70527 positions
+  [play] 700/1000 games done | 82144 positions
+  [play] 800/1000 games done | 93843 positions
+  [play] 900/1000 games done | 106170 positions
+  [play] 1000/1000 games done | 118136 positions
+  Collected 118136 positions (114369 unique) from 1000 games in 332.6s
+  Average plies per game: 118.1
+  Saved 1000 self-play games to runs/run_06/games/iter7.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1430/114369 positions | 131s elapsed | ~11 pos/s | ETA ~10366s
+  [label] 2/80 batches | 2860/114369 positions | 132s elapsed | ~22 pos/s | ETA ~5163s
+  [label] 3/80 batches | 4290/114369 positions | 133s elapsed | ~32 pos/s | ETA ~3417s
+  [label] 4/80 batches | 5720/114369 positions | 134s elapsed | ~43 pos/s | ETA ~2542s
+  [label] 5/80 batches | 7150/114369 positions | 134s elapsed | ~53 pos/s | ETA ~2008s
+  [label] 6/80 batches | 8580/114369 positions | 134s elapsed | ~64 pos/s | ETA ~1658s
+  [label] 7/80 batches | 10010/114369 positions | 135s elapsed | ~74 pos/s | ETA ~1407s
+  [label] 8/80 batches | 11440/114369 positions | 135s elapsed | ~85 pos/s | ETA ~1216s
+  [label] 9/80 batches | 12870/114369 positions | 136s elapsed | ~94 pos/s | ETA ~1075s
+  [label] 10/80 batches | 14300/114369 positions | 136s elapsed | ~105 pos/s | ETA ~954s
+  [label] 11/80 batches | 15730/114369 positions | 137s elapsed | ~115 pos/s | ETA ~860s
+  [label] 12/80 batches | 17160/114369 positions | 137s elapsed | ~125 pos/s | ETA ~777s
+  [label] 13/80 batches | 18590/114369 positions | 137s elapsed | ~135 pos/s | ETA ~708s
+  [label] 14/80 batches | 20020/114369 positions | 138s elapsed | ~145 pos/s | ETA ~652s
+  [label] 15/80 batches | 21450/114369 positions | 139s elapsed | ~155 pos/s | ETA ~600s
+  [label] 16/80 batches | 22880/114369 positions | 139s elapsed | ~165 pos/s | ETA ~555s
+  [label] 17/80 batches | 24310/114369 positions | 140s elapsed | ~174 pos/s | ETA ~518s
+  [label] 18/80 batches | 25740/114369 positions | 141s elapsed | ~183 pos/s | ETA ~485s
+  [label] 19/80 batches | 27170/114369 positions | 141s elapsed | ~192 pos/s | ETA ~454s
+  [label] 20/80 batches | 28600/114369 positions | 146s elapsed | ~196 pos/s | ETA ~438s
+  [label] 21/80 batches | 30030/114369 positions | 263s elapsed | ~114 pos/s | ETA ~738s
+  [label] 22/80 batches | 31460/114369 positions | 263s elapsed | ~119 pos/s | ETA ~694s
+  [label] 23/80 batches | 32890/114369 positions | 264s elapsed | ~125 pos/s | ETA ~654s
+  [label] 24/80 batches | 34320/114369 positions | 266s elapsed | ~129 pos/s | ETA ~620s
+  [label] 25/80 batches | 35750/114369 positions | 267s elapsed | ~134 pos/s | ETA ~588s
+  [label] 26/80 batches | 37180/114369 positions | 270s elapsed | ~138 pos/s | ETA ~561s
+  [label] 27/80 batches | 38610/114369 positions | 270s elapsed | ~143 pos/s | ETA ~530s
+  [label] 28/80 batches | 40040/114369 positions | 271s elapsed | ~148 pos/s | ETA ~503s
+  [label] 29/80 batches | 41470/114369 positions | 271s elapsed | ~153 pos/s | ETA ~476s
+  [label] 30/80 batches | 42900/114369 positions | 272s elapsed | ~158 pos/s | ETA ~452s
+  [label] 31/80 batches | 44330/114369 positions | 272s elapsed | ~163 pos/s | ETA ~430s
+  [label] 32/80 batches | 45760/114369 positions | 273s elapsed | ~168 pos/s | ETA ~409s
+  [label] 33/80 batches | 47190/114369 positions | 273s elapsed | ~173 pos/s | ETA ~389s
+  [label] 34/80 batches | 48620/114369 positions | 273s elapsed | ~178 pos/s | ETA ~369s
+  [label] 35/80 batches | 50050/114369 positions | 273s elapsed | ~183 pos/s | ETA ~351s
+  [label] 36/80 batches | 51480/114369 positions | 274s elapsed | ~188 pos/s | ETA ~335s
+  [label] 37/80 batches | 52910/114369 positions | 276s elapsed | ~191 pos/s | ETA ~321s
+  [label] 38/80 batches | 54340/114369 positions | 277s elapsed | ~196 pos/s | ETA ~306s
+  [label] 39/80 batches | 55770/114369 positions | 278s elapsed | ~200 pos/s | ETA ~293s
+  [label] 40/80 batches | 57200/114369 positions | 279s elapsed | ~205 pos/s | ETA ~279s
+  [label] 41/80 batches | 58630/114369 positions | 394s elapsed | ~149 pos/s | ETA ~375s
+  [label] 42/80 batches | 60060/114369 positions | 395s elapsed | ~152 pos/s | ETA ~357s
+  [label] 43/80 batches | 61490/114369 positions | 397s elapsed | ~155 pos/s | ETA ~341s
+  [label] 44/80 batches | 62920/114369 positions | 401s elapsed | ~157 pos/s | ETA ~328s
+  [label] 45/80 batches | 64350/114369 positions | 401s elapsed | ~161 pos/s | ETA ~312s
+  [label] 46/80 batches | 65780/114369 positions | 402s elapsed | ~164 pos/s | ETA ~297s
+  [label] 47/80 batches | 67210/114369 positions | 402s elapsed | ~167 pos/s | ETA ~282s
+  [label] 48/80 batches | 68640/114369 positions | 402s elapsed | ~171 pos/s | ETA ~268s
+  [label] 49/80 batches | 70070/114369 positions | 402s elapsed | ~174 pos/s | ETA ~254s
+  [label] 50/80 batches | 71500/114369 positions | 404s elapsed | ~177 pos/s | ETA ~242s
+  [label] 51/80 batches | 72930/114369 positions | 405s elapsed | ~180 pos/s | ETA ~230s
+  [label] 52/80 batches | 74360/114369 positions | 405s elapsed | ~183 pos/s | ETA ~218s
+  [label] 53/80 batches | 75790/114369 positions | 407s elapsed | ~186 pos/s | ETA ~207s
+  [label] 54/80 batches | 77220/114369 positions | 411s elapsed | ~188 pos/s | ETA ~198s
+  [label] 55/80 batches | 78650/114369 positions | 411s elapsed | ~191 pos/s | ETA ~187s
+  [label] 56/80 batches | 80080/114369 positions | 411s elapsed | ~195 pos/s | ETA ~176s
+  [label] 57/80 batches | 81510/114369 positions | 412s elapsed | ~198 pos/s | ETA ~166s
+  [label] 58/80 batches | 82940/114369 positions | 413s elapsed | ~201 pos/s | ETA ~157s
+  [label] 59/80 batches | 84370/114369 positions | 414s elapsed | ~204 pos/s | ETA ~147s
+  [label] 60/80 batches | 85800/114369 positions | 416s elapsed | ~206 pos/s | ETA ~138s
+  [label] 61/80 batches | 87230/114369 positions | 526s elapsed | ~166 pos/s | ETA ~164s
+  [label] 62/80 batches | 88660/114369 positions | 531s elapsed | ~167 pos/s | ETA ~154s
+  [label] 63/80 batches | 90090/114369 positions | 533s elapsed | ~169 pos/s | ETA ~144s
+  [label] 64/80 batches | 91520/114369 positions | 533s elapsed | ~172 pos/s | ETA ~133s
+  [label] 65/80 batches | 92950/114369 positions | 535s elapsed | ~174 pos/s | ETA ~123s
+  [label] 66/80 batches | 94380/114369 positions | 535s elapsed | ~176 pos/s | ETA ~113s
+  [label] 67/80 batches | 95810/114369 positions | 536s elapsed | ~179 pos/s | ETA ~104s
+  [label] 68/80 batches | 97240/114369 positions | 537s elapsed | ~181 pos/s | ETA ~95s
+  [label] 69/80 batches | 98670/114369 positions | 538s elapsed | ~183 pos/s | ETA ~86s
+  [label] 70/80 batches | 100100/114369 positions | 539s elapsed | ~186 pos/s | ETA ~77s
+  [label] 71/80 batches | 101530/114369 positions | 539s elapsed | ~188 pos/s | ETA ~68s
+  [label] 72/80 batches | 102960/114369 positions | 540s elapsed | ~191 pos/s | ETA ~60s
+  [label] 73/80 batches | 104390/114369 positions | 541s elapsed | ~193 pos/s | ETA ~52s
+  [label] 74/80 batches | 105820/114369 positions | 542s elapsed | ~195 pos/s | ETA ~44s
+  [label] 75/80 batches | 107250/114369 positions | 543s elapsed | ~198 pos/s | ETA ~36s
+  [label] 76/80 batches | 108680/114369 positions | 544s elapsed | ~200 pos/s | ETA ~28s
+  [label] 77/80 batches | 110110/114369 positions | 545s elapsed | ~202 pos/s | ETA ~21s
+  [label] 78/80 batches | 111509/114369 positions | 546s elapsed | ~204 pos/s | ETA ~14s
+  [label] 79/80 batches | 112939/114369 positions | 549s elapsed | ~206 pos/s | ETA ~7s
+  [label] 80/80 batches | 114369/114369 positions | 552s elapsed | ~207 pos/s | ETA ~0s
+Labeled 114369 positions in 553.3s
+
+Step 3: writing runs/run_06/data/iter7_raw.csv...
+Saved 114369 training examples to runs/run_06/data/iter7_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.00  std 45.69  min -100.00  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter7_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 114369 examples
+  Sampled foundation: 49015 examples
+  Mixed total: 163384 examples
+  Train: 147045 examples
+  Val: 16339 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter7_train.csv
+✓ Saved val to: runs/run_06/data/iter7_val.csv
+
+Final statistics:
+  Train - Foundation: 44235 (30.1%)
+  Train - New: 102810 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter7_train.csv
+Val data:     runs/run_06/data/iter7_val.csv
+Initial model:runs/run_06/models/model_M6.pth
+Output dir:   runs/run_06/models/iter7
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter7_train.csv...
+Precomputing 147,045 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 147,045 / 147,045 positions...
+Done. Board tensors shape: torch.Size([147045, 18, 8, 8])
+Policy indices shape: torch.Size([147045, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([147045, 128]) (sparse, ~37.6 MB)
+Positions with policy targets: 138,844 / 147,045 (94.4%)
+Loading runs/run_06/data/iter7_val.csv...
+Precomputing 16,339 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,339 / 16,339 positions...
+Done. Board tensors shape: torch.Size([16339, 18, 8, 8])
+Policy indices shape: torch.Size([16339, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16339, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,459 / 16,339 (94.6%)
+Train batches: 575  Val batches: 64
+Loading weights from runs/run_06/models/model_M6.pth
+Epoch 01/3  train 1.9813 (v 0.0400 p 1.9412)  |  val 2.0953 (v 0.0535 p 2.0418)  mae 8.21  top3/5 76.0%/86.5%
+  -> new best (val loss 2.0953)
+Epoch 02/3  train 1.8676 (v 0.0344 p 1.8332)  |  val 2.1006 (v 0.0442 p 2.0564)  mae 8.30  top3/5 76.0%/86.9%
+Epoch 03/3  train 1.7948 (v 0.0315 p 1.7634)  |  val 2.1275 (v 0.0463 p 2.0812)  mae 8.37  top3/5 75.6%/86.2%
+
+Training complete. Best val loss 2.0953. Checkpoints in runs/run_06/models/iter7
+
+[Step 4/4] Evaluating candidate (M7) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M7.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   13 (13.0%)
+Draws:  8 (8.0%)
+Losses: 79 (79.0%)
+Score:  0.170 (17.0%)
+Estimated ELO difference vs SF L3: -275
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M7): 0.170 (17.0%)
+  Improvement:       -0.075 (-7.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M7 (no reset)
+
+⏱  Iteration 7: play 333s · label 553s · mix 110s · train 42s · eval 51s · total 1093s (18.2 min)
+
+================================================================================
+ITERATION 8/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M7.pth
+  Output: runs/run_06/data/iter8_raw.csv
+  Self-play PGN: runs/run_06/games/iter8.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11511 positions
+  [play] 200/1000 games done | 23438 positions
+  [play] 300/1000 games done | 35021 positions
+  [play] 400/1000 games done | 46566 positions
+  [play] 500/1000 games done | 58279 positions
+  [play] 600/1000 games done | 68907 positions
+  [play] 700/1000 games done | 80573 positions
+  [play] 800/1000 games done | 91399 positions
+  [play] 900/1000 games done | 102787 positions
+  [play] 1000/1000 games done | 114891 positions
+  Collected 114891 positions (111147 unique) from 1000 games in 325.6s
+  Average plies per game: 114.9
+  Saved 1000 self-play games to runs/run_06/games/iter8.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1390/111147 positions | 122s elapsed | ~11 pos/s | ETA ~9646s
+  [label] 2/80 batches | 2780/111147 positions | 124s elapsed | ~22 pos/s | ETA ~4852s
+  [label] 3/80 batches | 4170/111147 positions | 125s elapsed | ~33 pos/s | ETA ~3203s
+  [label] 4/80 batches | 5560/111147 positions | 127s elapsed | ~44 pos/s | ETA ~2412s
+  [label] 5/80 batches | 6950/111147 positions | 127s elapsed | ~55 pos/s | ETA ~1907s
+  [label] 6/80 batches | 8340/111147 positions | 128s elapsed | ~65 pos/s | ETA ~1574s
+  [label] 7/80 batches | 9730/111147 positions | 128s elapsed | ~76 pos/s | ETA ~1339s
+  [label] 8/80 batches | 11120/111147 positions | 129s elapsed | ~86 pos/s | ETA ~1162s
+  [label] 9/80 batches | 12510/111147 positions | 130s elapsed | ~96 pos/s | ETA ~1025s
+  [label] 10/80 batches | 13900/111147 positions | 131s elapsed | ~106 pos/s | ETA ~914s
+  [label] 11/80 batches | 15290/111147 positions | 131s elapsed | ~117 pos/s | ETA ~820s
+  [label] 12/80 batches | 16680/111147 positions | 131s elapsed | ~127 pos/s | ETA ~742s
+  [label] 13/80 batches | 18070/111147 positions | 131s elapsed | ~138 pos/s | ETA ~675s
+  [label] 14/80 batches | 19460/111147 positions | 132s elapsed | ~148 pos/s | ETA ~620s
+  [label] 15/80 batches | 20850/111147 positions | 132s elapsed | ~157 pos/s | ETA ~573s
+  [label] 16/80 batches | 22240/111147 positions | 133s elapsed | ~167 pos/s | ETA ~531s
+  [label] 17/80 batches | 23630/111147 positions | 133s elapsed | ~178 pos/s | ETA ~493s
+  [label] 18/80 batches | 25020/111147 positions | 134s elapsed | ~187 pos/s | ETA ~461s
+  [label] 19/80 batches | 26410/111147 positions | 135s elapsed | ~196 pos/s | ETA ~432s
+  [label] 20/80 batches | 27800/111147 positions | 136s elapsed | ~204 pos/s | ETA ~409s
+  [label] 21/80 batches | 29190/111147 positions | 250s elapsed | ~117 pos/s | ETA ~701s
+  [label] 22/80 batches | 30580/111147 positions | 254s elapsed | ~120 pos/s | ETA ~669s
+  [label] 23/80 batches | 31970/111147 positions | 254s elapsed | ~126 pos/s | ETA ~630s
+  [label] 24/80 batches | 33360/111147 positions | 256s elapsed | ~130 pos/s | ETA ~598s
+  [label] 25/80 batches | 34750/111147 positions | 257s elapsed | ~135 pos/s | ETA ~566s
+  [label] 26/80 batches | 36140/111147 positions | 258s elapsed | ~140 pos/s | ETA ~536s
+  [label] 27/80 batches | 37530/111147 positions | 260s elapsed | ~144 pos/s | ETA ~510s
+  [label] 28/80 batches | 38920/111147 positions | 260s elapsed | ~150 pos/s | ETA ~483s
+  [label] 29/80 batches | 40310/111147 positions | 261s elapsed | ~155 pos/s | ETA ~458s
+  [label] 30/80 batches | 41700/111147 positions | 261s elapsed | ~160 pos/s | ETA ~435s
+  [label] 31/80 batches | 43090/111147 positions | 263s elapsed | ~164 pos/s | ETA ~415s
+  [label] 32/80 batches | 44480/111147 positions | 263s elapsed | ~169 pos/s | ETA ~394s
+  [label] 33/80 batches | 45870/111147 positions | 263s elapsed | ~175 pos/s | ETA ~374s
+  [label] 34/80 batches | 47260/111147 positions | 264s elapsed | ~179 pos/s | ETA ~356s
+  [label] 35/80 batches | 48650/111147 positions | 265s elapsed | ~183 pos/s | ETA ~341s
+  [label] 36/80 batches | 50040/111147 positions | 266s elapsed | ~188 pos/s | ETA ~324s
+  [label] 37/80 batches | 51430/111147 positions | 267s elapsed | ~193 pos/s | ETA ~310s
+  [label] 38/80 batches | 52820/111147 positions | 267s elapsed | ~198 pos/s | ETA ~295s
+  [label] 39/80 batches | 54210/111147 positions | 268s elapsed | ~202 pos/s | ETA ~281s
+  [label] 40/80 batches | 55600/111147 positions | 272s elapsed | ~204 pos/s | ETA ~272s
+  [label] 41/80 batches | 56990/111147 positions | 377s elapsed | ~151 pos/s | ETA ~358s
+  [label] 42/80 batches | 58380/111147 positions | 385s elapsed | ~152 pos/s | ETA ~348s
+  [label] 43/80 batches | 59770/111147 positions | 386s elapsed | ~155 pos/s | ETA ~332s
+  [label] 44/80 batches | 61160/111147 positions | 387s elapsed | ~158 pos/s | ETA ~316s
+  [label] 45/80 batches | 62550/111147 positions | 387s elapsed | ~162 pos/s | ETA ~301s
+  [label] 46/80 batches | 63940/111147 positions | 387s elapsed | ~165 pos/s | ETA ~286s
+  [label] 47/80 batches | 65330/111147 positions | 387s elapsed | ~169 pos/s | ETA ~272s
+  [label] 48/80 batches | 66720/111147 positions | 389s elapsed | ~172 pos/s | ETA ~259s
+  [label] 49/80 batches | 68110/111147 positions | 389s elapsed | ~175 pos/s | ETA ~246s
+  [label] 50/80 batches | 69500/111147 positions | 393s elapsed | ~177 pos/s | ETA ~236s
+  [label] 51/80 batches | 70890/111147 positions | 394s elapsed | ~180 pos/s | ETA ~224s
+  [label] 52/80 batches | 72280/111147 positions | 395s elapsed | ~183 pos/s | ETA ~213s
+  [label] 53/80 batches | 73670/111147 positions | 396s elapsed | ~186 pos/s | ETA ~201s
+  [label] 54/80 batches | 75060/111147 positions | 396s elapsed | ~190 pos/s | ETA ~190s
+  [label] 55/80 batches | 76450/111147 positions | 397s elapsed | ~193 pos/s | ETA ~180s
+  [label] 56/80 batches | 77840/111147 positions | 398s elapsed | ~195 pos/s | ETA ~170s
+  [label] 57/80 batches | 79230/111147 positions | 399s elapsed | ~199 pos/s | ETA ~161s
+  [label] 58/80 batches | 80620/111147 positions | 399s elapsed | ~202 pos/s | ETA ~151s
+  [label] 59/80 batches | 82010/111147 positions | 401s elapsed | ~204 pos/s | ETA ~143s
+  [label] 60/80 batches | 83400/111147 positions | 409s elapsed | ~204 pos/s | ETA ~136s
+  [label] 61/80 batches | 84790/111147 positions | 502s elapsed | ~169 pos/s | ETA ~156s
+  [label] 62/80 batches | 86180/111147 positions | 511s elapsed | ~169 pos/s | ETA ~148s
+  [label] 63/80 batches | 87570/111147 positions | 515s elapsed | ~170 pos/s | ETA ~139s
+  [label] 64/80 batches | 88960/111147 positions | 515s elapsed | ~173 pos/s | ETA ~129s
+  [label] 65/80 batches | 90350/111147 positions | 518s elapsed | ~175 pos/s | ETA ~119s
+  [label] 66/80 batches | 91740/111147 positions | 519s elapsed | ~177 pos/s | ETA ~110s
+  [label] 67/80 batches | 93130/111147 positions | 519s elapsed | ~180 pos/s | ETA ~100s
+  [label] 68/80 batches | 94520/111147 positions | 520s elapsed | ~182 pos/s | ETA ~91s
+  [label] 69/80 batches | 95910/111147 positions | 520s elapsed | ~184 pos/s | ETA ~83s
+  [label] 70/80 batches | 97300/111147 positions | 524s elapsed | ~186 pos/s | ETA ~75s
+  [label] 71/80 batches | 98690/111147 positions | 524s elapsed | ~188 pos/s | ETA ~66s
+  [label] 72/80 batches | 100080/111147 positions | 525s elapsed | ~190 pos/s | ETA ~58s
+  [label] 73/80 batches | 101470/111147 positions | 527s elapsed | ~193 pos/s | ETA ~50s
+  [label] 74/80 batches | 102860/111147 positions | 529s elapsed | ~194 pos/s | ETA ~43s
+  [label] 75/80 batches | 104250/111147 positions | 530s elapsed | ~197 pos/s | ETA ~35s
+  [label] 76/80 batches | 105640/111147 positions | 530s elapsed | ~199 pos/s | ETA ~28s
+  [label] 77/80 batches | 107030/111147 positions | 531s elapsed | ~202 pos/s | ETA ~20s
+  [label] 78/80 batches | 108420/111147 positions | 531s elapsed | ~204 pos/s | ETA ~13s
+  [label] 79/80 batches | 109810/111147 positions | 532s elapsed | ~206 pos/s | ETA ~6s
+  [label] 80/80 batches | 111147/111147 positions | 534s elapsed | ~208 pos/s | ETA ~0s
+Labeled 111147 positions in 535.5s
+
+Step 3: writing runs/run_06/data/iter8_raw.csv...
+Saved 111147 training examples to runs/run_06/data/iter8_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.73  std 45.55  min -99.99  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter8_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 111147 examples
+  Sampled foundation: 47634 examples
+  Mixed total: 158781 examples
+  Train: 142902 examples
+  Val: 15879 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter8_train.csv
+✓ Saved val to: runs/run_06/data/iter8_val.csv
+
+Final statistics:
+  Train - Foundation: 42978 (30.1%)
+  Train - New: 99924 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter8_train.csv
+Val data:     runs/run_06/data/iter8_val.csv
+Initial model:runs/run_06/models/model_M7.pth
+Output dir:   runs/run_06/models/iter8
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter8_train.csv...
+Precomputing 142,902 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 142,902 / 142,902 positions...
+Done. Board tensors shape: torch.Size([142902, 18, 8, 8])
+Policy indices shape: torch.Size([142902, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([142902, 128]) (sparse, ~36.6 MB)
+Positions with policy targets: 134,942 / 142,902 (94.4%)
+Loading runs/run_06/data/iter8_val.csv...
+Precomputing 15,879 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 15,879 / 15,879 positions...
+Done. Board tensors shape: torch.Size([15879, 18, 8, 8])
+Policy indices shape: torch.Size([15879, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([15879, 128]) (sparse, ~4.1 MB)
+Positions with policy targets: 14,971 / 15,879 (94.3%)
+Train batches: 559  Val batches: 63
+Loading weights from runs/run_06/models/model_M7.pth
+Epoch 01/3  train 1.9759 (v 0.0398 p 1.9361)  |  val 2.0877 (v 0.0477 p 2.0400)  mae 8.69  top3/5 76.1%/86.8%
+  -> new best (val loss 2.0877)
+Epoch 02/3  train 1.8631 (v 0.0346 p 1.8285)  |  val 2.0906 (v 0.0393 p 2.0513)  mae 7.97  top3/5 76.0%/86.8%
+Epoch 03/3  train 1.7901 (v 0.0319 p 1.7582)  |  val 2.1124 (v 0.0420 p 2.0704)  mae 8.10  top3/5 75.1%/86.1%
+
+Training complete. Best val loss 2.0877. Checkpoints in runs/run_06/models/iter8
+
+[Step 4/4] Evaluating candidate (M8) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M8.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   8 (8.0%)
+Draws:  13 (13.0%)
+Losses: 79 (79.0%)
+Score:  0.145 (14.5%)
+Estimated ELO difference vs SF L3: -308
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M8): 0.145 (14.5%)
+  Improvement:       -0.100 (-10.0%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M8 (no reset)
+
+⏱  Iteration 8: play 326s · label 535s · mix 104s · train 41s · eval 51s · total 1061s (17.7 min)
+
+================================================================================
+ITERATION 9/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M8.pth
+  Output: runs/run_06/data/iter9_raw.csv
+  Self-play PGN: runs/run_06/games/iter9.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11243 positions
+  [play] 200/1000 games done | 22506 positions
+  [play] 300/1000 games done | 33987 positions
+  [play] 400/1000 games done | 45136 positions
+  [play] 500/1000 games done | 56739 positions
+  [play] 600/1000 games done | 67796 positions
+  [play] 700/1000 games done | 79099 positions
+  [play] 800/1000 games done | 90984 positions
+  [play] 900/1000 games done | 102662 positions
+  [play] 1000/1000 games done | 114577 positions
+  Collected 114577 positions (110799 unique) from 1000 games in 322.2s
+  Average plies per game: 114.6
+  Saved 1000 self-play games to runs/run_06/games/iter9.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1385/110799 positions | 126s elapsed | ~11 pos/s | ETA ~9943s
+  [label] 2/80 batches | 2770/110799 positions | 126s elapsed | ~22 pos/s | ETA ~4924s
+  [label] 3/80 batches | 4155/110799 positions | 127s elapsed | ~33 pos/s | ETA ~3257s
+  [label] 4/80 batches | 5540/110799 positions | 127s elapsed | ~44 pos/s | ETA ~2412s
+  [label] 5/80 batches | 6925/110799 positions | 128s elapsed | ~54 pos/s | ETA ~1924s
+  [label] 6/80 batches | 8310/110799 positions | 129s elapsed | ~64 pos/s | ETA ~1592s
+  [label] 7/80 batches | 9695/110799 positions | 130s elapsed | ~75 pos/s | ETA ~1352s
+  [label] 8/80 batches | 11080/110799 positions | 130s elapsed | ~85 pos/s | ETA ~1169s
+  [label] 9/80 batches | 12465/110799 positions | 131s elapsed | ~95 pos/s | ETA ~1031s
+  [label] 10/80 batches | 13850/110799 positions | 132s elapsed | ~105 pos/s | ETA ~923s
+  [label] 11/80 batches | 15235/110799 positions | 132s elapsed | ~115 pos/s | ETA ~829s
+  [label] 12/80 batches | 16620/110799 positions | 132s elapsed | ~126 pos/s | ETA ~749s
+  [label] 13/80 batches | 18005/110799 positions | 132s elapsed | ~136 pos/s | ETA ~682s
+  [label] 14/80 batches | 19390/110799 positions | 133s elapsed | ~145 pos/s | ETA ~629s
+  [label] 15/80 batches | 20775/110799 positions | 134s elapsed | ~155 pos/s | ETA ~582s
+  [label] 16/80 batches | 22160/110799 positions | 135s elapsed | ~165 pos/s | ETA ~538s
+  [label] 17/80 batches | 23545/110799 positions | 135s elapsed | ~174 pos/s | ETA ~502s
+  [label] 18/80 batches | 24930/110799 positions | 136s elapsed | ~184 pos/s | ETA ~467s
+  [label] 19/80 batches | 26315/110799 positions | 139s elapsed | ~190 pos/s | ETA ~445s
+  [label] 20/80 batches | 27700/110799 positions | 140s elapsed | ~198 pos/s | ETA ~419s
+  [label] 21/80 batches | 29085/110799 positions | 255s elapsed | ~114 pos/s | ETA ~716s
+  [label] 22/80 batches | 30470/110799 positions | 255s elapsed | ~119 pos/s | ETA ~673s
+  [label] 23/80 batches | 31855/110799 positions | 256s elapsed | ~125 pos/s | ETA ~633s
+  [label] 24/80 batches | 33240/110799 positions | 256s elapsed | ~130 pos/s | ETA ~597s
+  [label] 25/80 batches | 34625/110799 positions | 256s elapsed | ~135 pos/s | ETA ~564s
+  [label] 26/80 batches | 36010/110799 positions | 258s elapsed | ~140 pos/s | ETA ~535s
+  [label] 27/80 batches | 37395/110799 positions | 259s elapsed | ~144 pos/s | ETA ~508s
+  [label] 28/80 batches | 38780/110799 positions | 261s elapsed | ~149 pos/s | ETA ~484s
+  [label] 29/80 batches | 40165/110799 positions | 262s elapsed | ~154 pos/s | ETA ~460s
+  [label] 30/80 batches | 41550/110799 positions | 262s elapsed | ~158 pos/s | ETA ~437s
+  [label] 31/80 batches | 42935/110799 positions | 263s elapsed | ~163 pos/s | ETA ~416s
+  [label] 32/80 batches | 44320/110799 positions | 263s elapsed | ~168 pos/s | ETA ~395s
+  [label] 33/80 batches | 45705/110799 positions | 264s elapsed | ~173 pos/s | ETA ~376s
+  [label] 34/80 batches | 47090/110799 positions | 264s elapsed | ~178 pos/s | ETA ~358s
+  [label] 35/80 batches | 48475/110799 positions | 265s elapsed | ~183 pos/s | ETA ~341s
+  [label] 36/80 batches | 49860/110799 positions | 266s elapsed | ~188 pos/s | ETA ~325s
+  [label] 37/80 batches | 51245/110799 positions | 268s elapsed | ~192 pos/s | ETA ~311s
+  [label] 38/80 batches | 52630/110799 positions | 271s elapsed | ~194 pos/s | ETA ~300s
+  [label] 39/80 batches | 54015/110799 positions | 272s elapsed | ~199 pos/s | ETA ~285s
+  [label] 40/80 batches | 55400/110799 positions | 272s elapsed | ~203 pos/s | ETA ~272s
+  [label] 41/80 batches | 56785/110799 positions | 380s elapsed | ~149 pos/s | ETA ~362s
+  [label] 42/80 batches | 58170/110799 positions | 381s elapsed | ~153 pos/s | ETA ~344s
+  [label] 43/80 batches | 59555/110799 positions | 385s elapsed | ~155 pos/s | ETA ~331s
+  [label] 44/80 batches | 60940/110799 positions | 388s elapsed | ~157 pos/s | ETA ~317s
+  [label] 45/80 batches | 62325/110799 positions | 388s elapsed | ~161 pos/s | ETA ~302s
+  [label] 46/80 batches | 63710/110799 positions | 389s elapsed | ~164 pos/s | ETA ~288s
+  [label] 47/80 batches | 65095/110799 positions | 389s elapsed | ~167 pos/s | ETA ~273s
+  [label] 48/80 batches | 66480/110799 positions | 390s elapsed | ~170 pos/s | ETA ~260s
+  [label] 49/80 batches | 67865/110799 positions | 391s elapsed | ~174 pos/s | ETA ~247s
+  [label] 50/80 batches | 69250/110799 positions | 391s elapsed | ~177 pos/s | ETA ~234s
+  [label] 51/80 batches | 70635/110799 positions | 392s elapsed | ~180 pos/s | ETA ~223s
+  [label] 52/80 batches | 72020/110799 positions | 394s elapsed | ~183 pos/s | ETA ~212s
+  [label] 53/80 batches | 73405/110799 positions | 397s elapsed | ~185 pos/s | ETA ~202s
+  [label] 54/80 batches | 74790/110799 positions | 400s elapsed | ~187 pos/s | ETA ~193s
+  [label] 55/80 batches | 76175/110799 positions | 401s elapsed | ~190 pos/s | ETA ~182s
+  [label] 56/80 batches | 77560/110799 positions | 401s elapsed | ~193 pos/s | ETA ~172s
+  [label] 57/80 batches | 78945/110799 positions | 402s elapsed | ~196 pos/s | ETA ~162s
+  [label] 58/80 batches | 80330/110799 positions | 403s elapsed | ~199 pos/s | ETA ~153s
+  [label] 59/80 batches | 81715/110799 positions | 404s elapsed | ~202 pos/s | ETA ~144s
+  [label] 60/80 batches | 83100/110799 positions | 405s elapsed | ~205 pos/s | ETA ~135s
+  [label] 61/80 batches | 84485/110799 positions | 502s elapsed | ~168 pos/s | ETA ~156s
+  [label] 62/80 batches | 85870/110799 positions | 510s elapsed | ~168 pos/s | ETA ~148s
+  [label] 63/80 batches | 87255/110799 positions | 517s elapsed | ~169 pos/s | ETA ~139s
+  [label] 64/80 batches | 88640/110799 positions | 517s elapsed | ~172 pos/s | ETA ~129s
+  [label] 65/80 batches | 90025/110799 positions | 521s elapsed | ~173 pos/s | ETA ~120s
+  [label] 66/80 batches | 91410/110799 positions | 521s elapsed | ~175 pos/s | ETA ~111s
+  [label] 67/80 batches | 92795/110799 positions | 522s elapsed | ~178 pos/s | ETA ~101s
+  [label] 68/80 batches | 94180/110799 positions | 522s elapsed | ~180 pos/s | ETA ~92s
+  [label] 69/80 batches | 95565/110799 positions | 523s elapsed | ~183 pos/s | ETA ~83s
+  [label] 70/80 batches | 96950/110799 positions | 523s elapsed | ~185 pos/s | ETA ~75s
+  [label] 71/80 batches | 98335/110799 positions | 526s elapsed | ~187 pos/s | ETA ~67s
+  [label] 72/80 batches | 99720/110799 positions | 528s elapsed | ~189 pos/s | ETA ~59s
+  [label] 73/80 batches | 101105/110799 positions | 529s elapsed | ~191 pos/s | ETA ~51s
+  [label] 74/80 batches | 102490/110799 positions | 530s elapsed | ~193 pos/s | ETA ~43s
+  [label] 75/80 batches | 103875/110799 positions | 530s elapsed | ~196 pos/s | ETA ~35s
+  [label] 76/80 batches | 105260/110799 positions | 531s elapsed | ~198 pos/s | ETA ~28s
+  [label] 77/80 batches | 106645/110799 positions | 532s elapsed | ~201 pos/s | ETA ~21s
+  [label] 78/80 batches | 108030/110799 positions | 536s elapsed | ~201 pos/s | ETA ~14s
+  [label] 79/80 batches | 109414/110799 positions | 540s elapsed | ~203 pos/s | ETA ~7s
+  [label] 80/80 batches | 110799/110799 positions | 541s elapsed | ~205 pos/s | ETA ~0s
+Labeled 110799 positions in 541.5s
+
+Step 3: writing runs/run_06/data/iter9_raw.csv...
+Saved 110799 training examples to runs/run_06/data/iter9_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.27  std 45.01  min -100.00  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter9_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 110799 examples
+  Sampled foundation: 47485 examples
+  Mixed total: 158284 examples
+  Train: 142455 examples
+  Val: 15829 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter9_train.csv
+✓ Saved val to: runs/run_06/data/iter9_val.csv
+
+Final statistics:
+  Train - Foundation: 42854 (30.1%)
+  Train - New: 99601 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter9_train.csv
+Val data:     runs/run_06/data/iter9_val.csv
+Initial model:runs/run_06/models/model_M8.pth
+Output dir:   runs/run_06/models/iter9
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter9_train.csv...
+Precomputing 142,455 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 142,455 / 142,455 positions...
+Done. Board tensors shape: torch.Size([142455, 18, 8, 8])
+Policy indices shape: torch.Size([142455, 5]) (sparse, ~2.8 MB)
+Legal move indices shape: torch.Size([142455, 128]) (sparse, ~36.5 MB)
+Positions with policy targets: 134,737 / 142,455 (94.6%)
+Loading runs/run_06/data/iter9_val.csv...
+Precomputing 15,829 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 15,829 / 15,829 positions...
+Done. Board tensors shape: torch.Size([15829, 18, 8, 8])
+Policy indices shape: torch.Size([15829, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([15829, 128]) (sparse, ~4.1 MB)
+Positions with policy targets: 14,997 / 15,829 (94.7%)
+Train batches: 557  Val batches: 62
+Loading weights from runs/run_06/models/model_M8.pth
+Epoch 01/3  train 1.9604 (v 0.0389 p 1.9215)  |  val 2.0621 (v 0.0400 p 2.0221)  mae 8.08  top3/5 76.2%/86.9%
+  -> new best (val loss 2.0621)
+Epoch 02/3  train 1.8514 (v 0.0346 p 1.8168)  |  val 2.0765 (v 0.0383 p 2.0382)  mae 8.40  top3/5 76.0%/86.3%
+Epoch 03/3  train 1.7788 (v 0.0315 p 1.7473)  |  val 2.0951 (v 0.0391 p 2.0560)  mae 8.31  top3/5 75.5%/86.5%
+
+Training complete. Best val loss 2.0621. Checkpoints in runs/run_06/models/iter9
+
+[Step 4/4] Evaluating candidate (M9) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M9.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   11 (11.0%)
+Draws:  14 (14.0%)
+Losses: 75 (75.0%)
+Score:  0.180 (18.0%)
+Estimated ELO difference vs SF L3: -263
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M9): 0.180 (18.0%)
+  Improvement:       -0.065 (-6.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M9 (no reset)
+
+⏱  Iteration 9: play 322s · label 542s · mix 107s · train 40s · eval 51s · total 1066s (17.8 min)
+
+================================================================================
+ITERATION 10/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M9.pth
+  Output: runs/run_06/data/iter10_raw.csv
+  Self-play PGN: runs/run_06/games/iter10.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 10868 positions
+  [play] 200/1000 games done | 21802 positions
+  [play] 300/1000 games done | 33669 positions
+  [play] 400/1000 games done | 45098 positions
+  [play] 500/1000 games done | 57189 positions
+  [play] 600/1000 games done | 69159 positions
+  [play] 700/1000 games done | 81128 positions
+  [play] 800/1000 games done | 92341 positions
+  [play] 900/1000 games done | 104015 positions
+  [play] 1000/1000 games done | 116217 positions
+  Collected 116217 positions (112459 unique) from 1000 games in 327.4s
+  Average plies per game: 116.2
+  Saved 1000 self-play games to runs/run_06/games/iter10.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1406/112459 positions | 130s elapsed | ~11 pos/s | ETA ~10265s
+  [label] 2/80 batches | 2812/112459 positions | 130s elapsed | ~22 pos/s | ETA ~5072s
+  [label] 3/80 batches | 4218/112459 positions | 131s elapsed | ~32 pos/s | ETA ~3356s
+  [label] 4/80 batches | 5624/112459 positions | 131s elapsed | ~43 pos/s | ETA ~2487s
+  [label] 5/80 batches | 7030/112459 positions | 132s elapsed | ~53 pos/s | ETA ~1979s
+  [label] 6/80 batches | 8436/112459 positions | 133s elapsed | ~64 pos/s | ETA ~1637s
+  [label] 7/80 batches | 9842/112459 positions | 134s elapsed | ~73 pos/s | ETA ~1401s
+  [label] 8/80 batches | 11248/112459 positions | 135s elapsed | ~84 pos/s | ETA ~1212s
+  [label] 9/80 batches | 12654/112459 positions | 136s elapsed | ~93 pos/s | ETA ~1072s
+  [label] 10/80 batches | 14060/112459 positions | 136s elapsed | ~103 pos/s | ETA ~955s
+  [label] 11/80 batches | 15466/112459 positions | 137s elapsed | ~113 pos/s | ETA ~860s
+  [label] 12/80 batches | 16872/112459 positions | 137s elapsed | ~123 pos/s | ETA ~778s
+  [label] 13/80 batches | 18278/112459 positions | 138s elapsed | ~132 pos/s | ETA ~712s
+  [label] 14/80 batches | 19684/112459 positions | 138s elapsed | ~142 pos/s | ETA ~652s
+  [label] 15/80 batches | 21090/112459 positions | 139s elapsed | ~152 pos/s | ETA ~601s
+  [label] 16/80 batches | 22496/112459 positions | 139s elapsed | ~161 pos/s | ETA ~557s
+  [label] 17/80 batches | 23902/112459 positions | 139s elapsed | ~171 pos/s | ETA ~517s
+  [label] 18/80 batches | 25308/112459 positions | 140s elapsed | ~181 pos/s | ETA ~482s
+  [label] 19/80 batches | 26714/112459 positions | 140s elapsed | ~190 pos/s | ETA ~450s
+  [label] 20/80 batches | 28120/112459 positions | 141s elapsed | ~199 pos/s | ETA ~424s
+  [label] 21/80 batches | 29526/112459 positions | 251s elapsed | ~117 pos/s | ETA ~706s
+  [label] 22/80 batches | 30932/112459 positions | 262s elapsed | ~118 pos/s | ETA ~690s
+  [label] 23/80 batches | 32338/112459 positions | 262s elapsed | ~123 pos/s | ETA ~649s
+  [label] 24/80 batches | 33744/112459 positions | 264s elapsed | ~128 pos/s | ETA ~615s
+  [label] 25/80 batches | 35150/112459 positions | 267s elapsed | ~132 pos/s | ETA ~587s
+  [label] 26/80 batches | 36556/112459 positions | 267s elapsed | ~137 pos/s | ETA ~554s
+  [label] 27/80 batches | 37962/112459 positions | 268s elapsed | ~141 pos/s | ETA ~527s
+  [label] 28/80 batches | 39368/112459 positions | 269s elapsed | ~146 pos/s | ETA ~499s
+  [label] 29/80 batches | 40774/112459 positions | 271s elapsed | ~151 pos/s | ETA ~476s
+  [label] 30/80 batches | 42180/112459 positions | 271s elapsed | ~156 pos/s | ETA ~452s
+  [label] 31/80 batches | 43586/112459 positions | 272s elapsed | ~160 pos/s | ETA ~430s
+  [label] 32/80 batches | 44992/112459 positions | 273s elapsed | ~165 pos/s | ETA ~410s
+  [label] 33/80 batches | 46398/112459 positions | 274s elapsed | ~170 pos/s | ETA ~389s
+  [label] 34/80 batches | 47804/112459 positions | 274s elapsed | ~174 pos/s | ETA ~371s
+  [label] 35/80 batches | 49210/112459 positions | 275s elapsed | ~179 pos/s | ETA ~353s
+  [label] 36/80 batches | 50616/112459 positions | 275s elapsed | ~184 pos/s | ETA ~335s
+  [label] 37/80 batches | 52022/112459 positions | 275s elapsed | ~189 pos/s | ETA ~319s
+  [label] 38/80 batches | 53428/112459 positions | 275s elapsed | ~194 pos/s | ETA ~304s
+  [label] 39/80 batches | 54834/112459 positions | 275s elapsed | ~199 pos/s | ETA ~289s
+  [label] 40/80 batches | 56240/112459 positions | 276s elapsed | ~203 pos/s | ETA ~276s
+  [label] 41/80 batches | 57646/112459 positions | 380s elapsed | ~152 pos/s | ETA ~362s
+  [label] 42/80 batches | 59052/112459 positions | 390s elapsed | ~151 pos/s | ETA ~353s
+  [label] 43/80 batches | 60458/112459 positions | 393s elapsed | ~154 pos/s | ETA ~338s
+  [label] 44/80 batches | 61864/112459 positions | 393s elapsed | ~157 pos/s | ETA ~322s
+  [label] 45/80 batches | 63270/112459 positions | 396s elapsed | ~160 pos/s | ETA ~308s
+  [label] 46/80 batches | 64676/112459 positions | 397s elapsed | ~163 pos/s | ETA ~293s
+  [label] 47/80 batches | 66082/112459 positions | 400s elapsed | ~165 pos/s | ETA ~281s
+  [label] 48/80 batches | 67488/112459 positions | 401s elapsed | ~168 pos/s | ETA ~267s
+  [label] 49/80 batches | 68894/112459 positions | 403s elapsed | ~171 pos/s | ETA ~255s
+  [label] 50/80 batches | 70300/112459 positions | 403s elapsed | ~174 pos/s | ETA ~242s
+  [label] 51/80 batches | 71706/112459 positions | 404s elapsed | ~178 pos/s | ETA ~230s
+  [label] 52/80 batches | 73112/112459 positions | 404s elapsed | ~181 pos/s | ETA ~217s
+  [label] 53/80 batches | 74518/112459 positions | 404s elapsed | ~184 pos/s | ETA ~206s
+  [label] 54/80 batches | 75924/112459 positions | 405s elapsed | ~187 pos/s | ETA ~195s
+  [label] 55/80 batches | 77330/112459 positions | 405s elapsed | ~191 pos/s | ETA ~184s
+  [label] 56/80 batches | 78736/112459 positions | 406s elapsed | ~194 pos/s | ETA ~174s
+  [label] 57/80 batches | 80142/112459 positions | 407s elapsed | ~197 pos/s | ETA ~164s
+  [label] 58/80 batches | 81548/112459 positions | 407s elapsed | ~201 pos/s | ETA ~154s
+  [label] 59/80 batches | 82954/112459 positions | 408s elapsed | ~203 pos/s | ETA ~145s
+  [label] 60/80 batches | 84360/112459 positions | 409s elapsed | ~206 pos/s | ETA ~136s
+  [label] 61/80 batches | 85766/112459 positions | 509s elapsed | ~168 pos/s | ETA ~159s
+  [label] 62/80 batches | 87172/112459 positions | 519s elapsed | ~168 pos/s | ETA ~151s
+  [label] 63/80 batches | 88578/112459 positions | 522s elapsed | ~170 pos/s | ETA ~141s
+  [label] 64/80 batches | 89984/112459 positions | 525s elapsed | ~171 pos/s | ETA ~131s
+  [label] 65/80 batches | 91390/112459 positions | 526s elapsed | ~174 pos/s | ETA ~121s
+  [label] 66/80 batches | 92796/112459 positions | 529s elapsed | ~175 pos/s | ETA ~112s
+  [label] 67/80 batches | 94202/112459 positions | 531s elapsed | ~178 pos/s | ETA ~103s
+  [label] 68/80 batches | 95608/112459 positions | 531s elapsed | ~180 pos/s | ETA ~94s
+  [label] 69/80 batches | 97014/112459 positions | 532s elapsed | ~182 pos/s | ETA ~85s
+  [label] 70/80 batches | 98420/112459 positions | 535s elapsed | ~184 pos/s | ETA ~76s
+  [label] 71/80 batches | 99826/112459 positions | 535s elapsed | ~187 pos/s | ETA ~68s
+  [label] 72/80 batches | 101232/112459 positions | 536s elapsed | ~189 pos/s | ETA ~59s
+  [label] 73/80 batches | 102638/112459 positions | 537s elapsed | ~191 pos/s | ETA ~51s
+  [label] 74/80 batches | 104044/112459 positions | 537s elapsed | ~194 pos/s | ETA ~43s
+  [label] 75/80 batches | 105450/112459 positions | 538s elapsed | ~196 pos/s | ETA ~36s
+  [label] 76/80 batches | 106856/112459 positions | 539s elapsed | ~198 pos/s | ETA ~28s
+  [label] 77/80 batches | 108262/112459 positions | 540s elapsed | ~201 pos/s | ETA ~21s
+  [label] 78/80 batches | 109668/112459 positions | 540s elapsed | ~203 pos/s | ETA ~14s
+  [label] 79/80 batches | 111074/112459 positions | 542s elapsed | ~205 pos/s | ETA ~7s
+  [label] 80/80 batches | 112459/112459 positions | 542s elapsed | ~207 pos/s | ETA ~0s
+Labeled 112459 positions in 543.3s
+
+Step 3: writing runs/run_06/data/iter10_raw.csv...
+Saved 112459 training examples to runs/run_06/data/iter10_raw.csv
+
+Eval column (white pov, pawns):
+  mean 0.16  std 45.61  min -100.00  max 100.00
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter10_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 112459 examples
+  Sampled foundation: 48196 examples
+  Mixed total: 160655 examples
+  Train: 144589 examples
+  Val: 16066 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter10_train.csv
+✓ Saved val to: runs/run_06/data/iter10_val.csv
+
+Final statistics:
+  Train - Foundation: 43501 (30.1%)
+  Train - New: 101088 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter10_train.csv
+Val data:     runs/run_06/data/iter10_val.csv
+Initial model:runs/run_06/models/model_M9.pth
+Output dir:   runs/run_06/models/iter10
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter10_train.csv...
+Precomputing 144,589 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 144,589 / 144,589 positions...
+Done. Board tensors shape: torch.Size([144589, 18, 8, 8])
+Policy indices shape: torch.Size([144589, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([144589, 128]) (sparse, ~37.0 MB)
+Positions with policy targets: 136,623 / 144,589 (94.5%)
+Loading runs/run_06/data/iter10_val.csv...
+Precomputing 16,066 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,066 / 16,066 positions...
+Done. Board tensors shape: torch.Size([16066, 18, 8, 8])
+Policy indices shape: torch.Size([16066, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16066, 128]) (sparse, ~4.1 MB)
+Positions with policy targets: 15,179 / 16,066 (94.5%)
+Train batches: 565  Val batches: 63
+Loading weights from runs/run_06/models/model_M9.pth
+Epoch 01/3  train 1.9594 (v 0.0395 p 1.9199)  |  val 2.0691 (v 0.0431 p 2.0260)  mae 8.58  top3/5 76.9%/87.1%
+  -> new best (val loss 2.0691)
+Epoch 02/3  train 1.8486 (v 0.0341 p 1.8146)  |  val 2.1020 (v 0.0568 p 2.0452)  mae 8.82  top3/5 76.5%/86.9%
+Epoch 03/3  train 1.7763 (v 0.0312 p 1.7451)  |  val 2.1026 (v 0.0409 p 2.0617)  mae 8.58  top3/5 76.3%/86.7%
+
+Training complete. Best val loss 2.0691. Checkpoints in runs/run_06/models/iter10
+
+[Step 4/4] Evaluating candidate (M10) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M10.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   5 (5.0%)
+Draws:  9 (9.0%)
+Losses: 86 (86.0%)
+Score:  0.095 (9.5%)
+Estimated ELO difference vs SF L3: -392
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M10): 0.095 (9.5%)
+  Improvement:       -0.150 (-15.0%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M10 (no reset)
+
+⏱  Iteration 10: play 327s · label 543s · mix 103s · train 39s · eval 55s · total 1072s (17.9 min)
+
+================================================================================
+ITERATION 11/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M10.pth
+  Output: runs/run_06/data/iter11_raw.csv
+  Self-play PGN: runs/run_06/games/iter11.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 11588 positions
+  [play] 200/1000 games done | 23774 positions
+  [play] 300/1000 games done | 35599 positions
+  [play] 400/1000 games done | 47029 positions
+  [play] 500/1000 games done | 58952 positions
+  [play] 600/1000 games done | 70721 positions
+  [play] 700/1000 games done | 82691 positions
+  [play] 800/1000 games done | 95280 positions
+  [play] 900/1000 games done | 106363 positions
+  [play] 1000/1000 games done | 118470 positions
+  Collected 118470 positions (114695 unique) from 1000 games in 332.1s
+  Average plies per game: 118.5
+  Saved 1000 self-play games to runs/run_06/games/iter11.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1434/114695 positions | 124s elapsed | ~12 pos/s | ETA ~9762s
+  [label] 2/80 batches | 2868/114695 positions | 124s elapsed | ~23 pos/s | ETA ~4827s
+  [label] 3/80 batches | 4302/114695 positions | 125s elapsed | ~34 pos/s | ETA ~3213s
+  [label] 4/80 batches | 5736/114695 positions | 128s elapsed | ~45 pos/s | ETA ~2434s
+  [label] 5/80 batches | 7170/114695 positions | 129s elapsed | ~56 pos/s | ETA ~1937s
+  [label] 6/80 batches | 8604/114695 positions | 130s elapsed | ~66 pos/s | ETA ~1602s
+  [label] 7/80 batches | 10038/114695 positions | 131s elapsed | ~77 pos/s | ETA ~1364s
+  [label] 8/80 batches | 11472/114695 positions | 134s elapsed | ~86 pos/s | ETA ~1205s
+  [label] 9/80 batches | 12906/114695 positions | 135s elapsed | ~95 pos/s | ETA ~1066s
+  [label] 10/80 batches | 14340/114695 positions | 136s elapsed | ~106 pos/s | ETA ~951s
+  [label] 11/80 batches | 15774/114695 positions | 136s elapsed | ~116 pos/s | ETA ~854s
+  [label] 12/80 batches | 17208/114695 positions | 137s elapsed | ~126 pos/s | ETA ~773s
+  [label] 13/80 batches | 18642/114695 positions | 137s elapsed | ~136 pos/s | ETA ~705s
+  [label] 14/80 batches | 20076/114695 positions | 137s elapsed | ~147 pos/s | ETA ~645s
+  [label] 15/80 batches | 21510/114695 positions | 137s elapsed | ~157 pos/s | ETA ~594s
+  [label] 16/80 batches | 22944/114695 positions | 137s elapsed | ~167 pos/s | ETA ~549s
+  [label] 17/80 batches | 24378/114695 positions | 139s elapsed | ~176 pos/s | ETA ~513s
+  [label] 18/80 batches | 25812/114695 positions | 139s elapsed | ~186 pos/s | ETA ~477s
+  [label] 19/80 batches | 27246/114695 positions | 140s elapsed | ~194 pos/s | ETA ~450s
+  [label] 20/80 batches | 28680/114695 positions | 141s elapsed | ~203 pos/s | ETA ~423s
+  [label] 21/80 batches | 30114/114695 positions | 249s elapsed | ~121 pos/s | ETA ~700s
+  [label] 22/80 batches | 31548/114695 positions | 257s elapsed | ~123 pos/s | ETA ~678s
+  [label] 23/80 batches | 32982/114695 positions | 259s elapsed | ~127 pos/s | ETA ~641s
+  [label] 24/80 batches | 34416/114695 positions | 259s elapsed | ~133 pos/s | ETA ~605s
+  [label] 25/80 batches | 35850/114695 positions | 262s elapsed | ~137 pos/s | ETA ~576s
+  [label] 26/80 batches | 37284/114695 positions | 265s elapsed | ~140 pos/s | ETA ~551s
+  [label] 27/80 batches | 38718/114695 positions | 267s elapsed | ~145 pos/s | ETA ~523s
+  [label] 28/80 batches | 40152/114695 positions | 268s elapsed | ~150 pos/s | ETA ~497s
+  [label] 29/80 batches | 41586/114695 positions | 268s elapsed | ~155 pos/s | ETA ~472s
+  [label] 30/80 batches | 43020/114695 positions | 268s elapsed | ~160 pos/s | ETA ~447s
+  [label] 31/80 batches | 44454/114695 positions | 269s elapsed | ~165 pos/s | ETA ~425s
+  [label] 32/80 batches | 45888/114695 positions | 270s elapsed | ~170 pos/s | ETA ~404s
+  [label] 33/80 batches | 47322/114695 positions | 270s elapsed | ~175 pos/s | ETA ~384s
+  [label] 34/80 batches | 48756/114695 positions | 271s elapsed | ~180 pos/s | ETA ~366s
+  [label] 35/80 batches | 50190/114695 positions | 271s elapsed | ~185 pos/s | ETA ~348s
+  [label] 36/80 batches | 51624/114695 positions | 271s elapsed | ~190 pos/s | ETA ~332s
+  [label] 37/80 batches | 53058/114695 positions | 272s elapsed | ~195 pos/s | ETA ~315s
+  [label] 38/80 batches | 54492/114695 positions | 274s elapsed | ~199 pos/s | ETA ~303s
+  [label] 39/80 batches | 55926/114695 positions | 278s elapsed | ~201 pos/s | ETA ~292s
+  [label] 40/80 batches | 57360/114695 positions | 278s elapsed | ~206 pos/s | ETA ~278s
+  [label] 41/80 batches | 58794/114695 positions | 384s elapsed | ~153 pos/s | ETA ~365s
+  [label] 42/80 batches | 60228/114695 positions | 384s elapsed | ~157 pos/s | ETA ~348s
+  [label] 43/80 batches | 61662/114695 positions | 387s elapsed | ~159 pos/s | ETA ~333s
+  [label] 44/80 batches | 63096/114695 positions | 391s elapsed | ~161 pos/s | ETA ~320s
+  [label] 45/80 batches | 64530/114695 positions | 397s elapsed | ~162 pos/s | ETA ~309s
+  [label] 46/80 batches | 65964/114695 positions | 398s elapsed | ~166 pos/s | ETA ~294s
+  [label] 47/80 batches | 67398/114695 positions | 399s elapsed | ~169 pos/s | ETA ~280s
+  [label] 48/80 batches | 68832/114695 positions | 399s elapsed | ~172 pos/s | ETA ~266s
+  [label] 49/80 batches | 70266/114695 positions | 401s elapsed | ~175 pos/s | ETA ~254s
+  [label] 50/80 batches | 71700/114695 positions | 402s elapsed | ~178 pos/s | ETA ~241s
+  [label] 51/80 batches | 73134/114695 positions | 403s elapsed | ~181 pos/s | ETA ~229s
+  [label] 52/80 batches | 74568/114695 positions | 405s elapsed | ~184 pos/s | ETA ~218s
+  [label] 53/80 batches | 76002/114695 positions | 407s elapsed | ~187 pos/s | ETA ~207s
+  [label] 54/80 batches | 77436/114695 positions | 407s elapsed | ~190 pos/s | ETA ~196s
+  [label] 55/80 batches | 78870/114695 positions | 407s elapsed | ~194 pos/s | ETA ~185s
+  [label] 56/80 batches | 80304/114695 positions | 407s elapsed | ~197 pos/s | ETA ~174s
+  [label] 57/80 batches | 81738/114695 positions | 407s elapsed | ~201 pos/s | ETA ~164s
+  [label] 58/80 batches | 83172/114695 positions | 409s elapsed | ~203 pos/s | ETA ~155s
+  [label] 59/80 batches | 84606/114695 positions | 409s elapsed | ~207 pos/s | ETA ~145s
+  [label] 60/80 batches | 86040/114695 positions | 410s elapsed | ~210 pos/s | ETA ~137s
+  [label] 61/80 batches | 87474/114695 positions | 514s elapsed | ~170 pos/s | ETA ~160s
+  [label] 62/80 batches | 88908/114695 positions | 516s elapsed | ~172 pos/s | ETA ~150s
+  [label] 63/80 batches | 90342/114695 positions | 521s elapsed | ~174 pos/s | ETA ~140s
+  [label] 64/80 batches | 91776/114695 positions | 524s elapsed | ~175 pos/s | ETA ~131s
+  [label] 65/80 batches | 93210/114695 positions | 526s elapsed | ~177 pos/s | ETA ~121s
+  [label] 66/80 batches | 94644/114695 positions | 529s elapsed | ~179 pos/s | ETA ~112s
+  [label] 67/80 batches | 96078/114695 positions | 529s elapsed | ~181 pos/s | ETA ~103s
+  [label] 68/80 batches | 97487/114695 positions | 535s elapsed | ~182 pos/s | ETA ~94s
+  [label] 69/80 batches | 98921/114695 positions | 536s elapsed | ~185 pos/s | ETA ~85s
+  [label] 70/80 batches | 100355/114695 positions | 536s elapsed | ~187 pos/s | ETA ~77s
+  [label] 71/80 batches | 101789/114695 positions | 536s elapsed | ~190 pos/s | ETA ~68s
+  [label] 72/80 batches | 103223/114695 positions | 536s elapsed | ~192 pos/s | ETA ~60s
+  [label] 73/80 batches | 104657/114695 positions | 537s elapsed | ~195 pos/s | ETA ~52s
+  [label] 74/80 batches | 106091/114695 positions | 538s elapsed | ~197 pos/s | ETA ~44s
+  [label] 75/80 batches | 107525/114695 positions | 539s elapsed | ~200 pos/s | ETA ~36s
+  [label] 76/80 batches | 108959/114695 positions | 540s elapsed | ~202 pos/s | ETA ~28s
+  [label] 77/80 batches | 110393/114695 positions | 540s elapsed | ~204 pos/s | ETA ~21s
+  [label] 78/80 batches | 111827/114695 positions | 541s elapsed | ~207 pos/s | ETA ~14s
+  [label] 79/80 batches | 113261/114695 positions | 544s elapsed | ~208 pos/s | ETA ~7s
+  [label] 80/80 batches | 114695/114695 positions | 544s elapsed | ~211 pos/s | ETA ~0s
+Labeled 114695 positions in 545.2s
+
+Step 3: writing runs/run_06/data/iter11_raw.csv...
+Saved 114695 training examples to runs/run_06/data/iter11_raw.csv
+
+Eval column (white pov, pawns):
+  mean -0.33  std 47.41  min -100.00  max 99.99
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter11_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 114695 examples
+  Sampled foundation: 49155 examples
+  Mixed total: 163850 examples
+  Train: 147465 examples
+  Val: 16385 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter11_train.csv
+✓ Saved val to: runs/run_06/data/iter11_val.csv
+
+Final statistics:
+  Train - Foundation: 44353 (30.1%)
+  Train - New: 103112 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter11_train.csv
+Val data:     runs/run_06/data/iter11_val.csv
+Initial model:runs/run_06/models/model_M10.pth
+Output dir:   runs/run_06/models/iter11
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter11_train.csv...
+Precomputing 147,465 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 147,465 / 147,465 positions...
+Done. Board tensors shape: torch.Size([147465, 18, 8, 8])
+Policy indices shape: torch.Size([147465, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([147465, 128]) (sparse, ~37.8 MB)
+Positions with policy targets: 138,559 / 147,465 (94.0%)
+Loading runs/run_06/data/iter11_val.csv...
+Precomputing 16,385 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,385 / 16,385 positions...
+Done. Board tensors shape: torch.Size([16385, 18, 8, 8])
+Policy indices shape: torch.Size([16385, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16385, 128]) (sparse, ~4.2 MB)
+Positions with policy targets: 15,393 / 16,385 (93.9%)
+Train batches: 577  Val batches: 65
+Loading weights from runs/run_06/models/model_M10.pth
+Epoch 01/3  train 1.9627 (v 0.0373 p 1.9255)  |  val 2.0964 (v 0.0457 p 2.0507)  mae 9.32  top3/5 76.0%/86.4%
+  -> new best (val loss 2.0964)
+Epoch 02/3  train 1.8564 (v 0.0329 p 1.8234)  |  val 2.0963 (v 0.0377 p 2.0586)  mae 8.73  top3/5 76.5%/86.7%
+  -> new best (val loss 2.0963)
+Epoch 03/3  train 1.7868 (v 0.0309 p 1.7558)  |  val 2.1397 (v 0.0371 p 2.1026)  mae 8.70  top3/5 75.3%/86.2%
+
+Training complete. Best val loss 2.0963. Checkpoints in runs/run_06/models/iter11
+
+[Step 4/4] Evaluating candidate (M11) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M11.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   11 (11.0%)
+Draws:  10 (10.0%)
+Losses: 79 (79.0%)
+Score:  0.160 (16.0%)
+Estimated ELO difference vs SF L3: -288
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M11): 0.160 (16.0%)
+  Improvement:       -0.085 (-8.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M11 (no reset)
+
+⏱  Iteration 11: play 332s · label 545s · mix 106s · train 40s · eval 48s · total 1076s (17.9 min)
+
+================================================================================
+ITERATION 12/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M11.pth
+  Output: runs/run_06/data/iter12_raw.csv
+  Self-play PGN: runs/run_06/games/iter12.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 10705 positions
+  [play] 200/1000 games done | 22673 positions
+  [play] 300/1000 games done | 34344 positions
+  [play] 400/1000 games done | 46367 positions
+  [play] 500/1000 games done | 57914 positions
+  [play] 600/1000 games done | 69784 positions
+  [play] 700/1000 games done | 81387 positions
+  [play] 800/1000 games done | 92781 positions
+  [play] 900/1000 games done | 104150 positions
+  [play] 1000/1000 games done | 116270 positions
+  Collected 116270 positions (112472 unique) from 1000 games in 324.8s
+  Average plies per game: 116.3
+  Saved 1000 self-play games to runs/run_06/games/iter12.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1406/112472 positions | 122s elapsed | ~12 pos/s | ETA ~9633s
+  [label] 2/80 batches | 2812/112472 positions | 125s elapsed | ~22 pos/s | ETA ~4889s
+  [label] 3/80 batches | 4218/112472 positions | 126s elapsed | ~33 pos/s | ETA ~3246s
+  [label] 4/80 batches | 5624/112472 positions | 128s elapsed | ~44 pos/s | ETA ~2437s
+  [label] 5/80 batches | 7030/112472 positions | 129s elapsed | ~54 pos/s | ETA ~1941s
+  [label] 6/80 batches | 8436/112472 positions | 130s elapsed | ~65 pos/s | ETA ~1597s
+  [label] 7/80 batches | 9842/112472 positions | 131s elapsed | ~75 pos/s | ETA ~1361s
+  [label] 8/80 batches | 11248/112472 positions | 131s elapsed | ~86 pos/s | ETA ~1176s
+  [label] 9/80 batches | 12654/112472 positions | 132s elapsed | ~96 pos/s | ETA ~1041s
+  [label] 10/80 batches | 14060/112472 positions | 133s elapsed | ~106 pos/s | ETA ~928s
+  [label] 11/80 batches | 15466/112472 positions | 133s elapsed | ~117 pos/s | ETA ~832s
+  [label] 12/80 batches | 16872/112472 positions | 134s elapsed | ~126 pos/s | ETA ~759s
+  [label] 13/80 batches | 18278/112472 positions | 135s elapsed | ~136 pos/s | ETA ~694s
+  [label] 14/80 batches | 19684/112472 positions | 135s elapsed | ~146 pos/s | ETA ~636s
+  [label] 15/80 batches | 21090/112472 positions | 135s elapsed | ~156 pos/s | ETA ~587s
+  [label] 16/80 batches | 22496/112472 positions | 137s elapsed | ~165 pos/s | ETA ~546s
+  [label] 17/80 batches | 23902/112472 positions | 138s elapsed | ~173 pos/s | ETA ~512s
+  [label] 18/80 batches | 25308/112472 positions | 138s elapsed | ~183 pos/s | ETA ~476s
+  [label] 19/80 batches | 26714/112472 positions | 139s elapsed | ~192 pos/s | ETA ~447s
+  [label] 20/80 batches | 28120/112472 positions | 140s elapsed | ~201 pos/s | ETA ~419s
+  [label] 21/80 batches | 29526/112472 positions | 248s elapsed | ~119 pos/s | ETA ~696s
+  [label] 22/80 batches | 30932/112472 positions | 259s elapsed | ~119 pos/s | ETA ~683s
+  [label] 23/80 batches | 32338/112472 positions | 259s elapsed | ~125 pos/s | ETA ~642s
+  [label] 24/80 batches | 33744/112472 positions | 260s elapsed | ~130 pos/s | ETA ~607s
+  [label] 25/80 batches | 35150/112472 positions | 260s elapsed | ~135 pos/s | ETA ~573s
+  [label] 26/80 batches | 36556/112472 positions | 261s elapsed | ~140 pos/s | ETA ~543s
+  [label] 27/80 batches | 37962/112472 positions | 261s elapsed | ~145 pos/s | ETA ~513s
+  [label] 28/80 batches | 39368/112472 positions | 262s elapsed | ~150 pos/s | ETA ~487s
+  [label] 29/80 batches | 40774/112472 positions | 263s elapsed | ~155 pos/s | ETA ~462s
+  [label] 30/80 batches | 42180/112472 positions | 263s elapsed | ~161 pos/s | ETA ~438s
+  [label] 31/80 batches | 43586/112472 positions | 263s elapsed | ~166 pos/s | ETA ~416s
+  [label] 32/80 batches | 44992/112472 positions | 263s elapsed | ~171 pos/s | ETA ~394s
+  [label] 33/80 batches | 46398/112472 positions | 263s elapsed | ~176 pos/s | ETA ~375s
+  [label] 34/80 batches | 47804/112472 positions | 263s elapsed | ~182 pos/s | ETA ~356s
+  [label] 35/80 batches | 49210/112472 positions | 265s elapsed | ~186 pos/s | ETA ~341s
+  [label] 36/80 batches | 50616/112472 positions | 267s elapsed | ~190 pos/s | ETA ~326s
+  [label] 37/80 batches | 52022/112472 positions | 268s elapsed | ~194 pos/s | ETA ~311s
+  [label] 38/80 batches | 53428/112472 positions | 271s elapsed | ~197 pos/s | ETA ~299s
+  [label] 39/80 batches | 54834/112472 positions | 274s elapsed | ~200 pos/s | ETA ~287s
+  [label] 40/80 batches | 56240/112472 positions | 279s elapsed | ~201 pos/s | ETA ~279s
+  [label] 41/80 batches | 57646/112472 positions | 375s elapsed | ~154 pos/s | ETA ~357s
+  [label] 42/80 batches | 59052/112472 positions | 390s elapsed | ~151 pos/s | ETA ~353s
+  [label] 43/80 batches | 60458/112472 positions | 392s elapsed | ~154 pos/s | ETA ~337s
+  [label] 44/80 batches | 61864/112472 positions | 392s elapsed | ~158 pos/s | ETA ~321s
+  [label] 45/80 batches | 63270/112472 positions | 392s elapsed | ~161 pos/s | ETA ~305s
+  [label] 46/80 batches | 64676/112472 positions | 392s elapsed | ~165 pos/s | ETA ~290s
+  [label] 47/80 batches | 66082/112472 positions | 393s elapsed | ~168 pos/s | ETA ~276s
+  [label] 48/80 batches | 67488/112472 positions | 393s elapsed | ~172 pos/s | ETA ~262s
+  [label] 49/80 batches | 68894/112472 positions | 394s elapsed | ~175 pos/s | ETA ~249s
+  [label] 50/80 batches | 70300/112472 positions | 395s elapsed | ~178 pos/s | ETA ~237s
+  [label] 51/80 batches | 71706/112472 positions | 396s elapsed | ~181 pos/s | ETA ~225s
+  [label] 52/80 batches | 73112/112472 positions | 396s elapsed | ~184 pos/s | ETA ~213s
+  [label] 53/80 batches | 74518/112472 positions | 396s elapsed | ~188 pos/s | ETA ~202s
+  [label] 54/80 batches | 75924/112472 positions | 396s elapsed | ~191 pos/s | ETA ~191s
+  [label] 55/80 batches | 77330/112472 positions | 397s elapsed | ~195 pos/s | ETA ~180s
+  [label] 56/80 batches | 78736/112472 positions | 400s elapsed | ~197 pos/s | ETA ~171s
+  [label] 57/80 batches | 80142/112472 positions | 400s elapsed | ~200 pos/s | ETA ~161s
+  [label] 58/80 batches | 81548/112472 positions | 401s elapsed | ~203 pos/s | ETA ~152s
+  [label] 59/80 batches | 82954/112472 positions | 403s elapsed | ~206 pos/s | ETA ~143s
+  [label] 60/80 batches | 84360/112472 positions | 413s elapsed | ~204 pos/s | ETA ~138s
+  [label] 61/80 batches | 85766/112472 positions | 504s elapsed | ~170 pos/s | ETA ~157s
+  [label] 62/80 batches | 87172/112472 positions | 517s elapsed | ~169 pos/s | ETA ~150s
+  [label] 63/80 batches | 88578/112472 positions | 521s elapsed | ~170 pos/s | ETA ~141s
+  [label] 64/80 batches | 89984/112472 positions | 522s elapsed | ~172 pos/s | ETA ~130s
+  [label] 65/80 batches | 91390/112472 positions | 523s elapsed | ~175 pos/s | ETA ~121s
+  [label] 66/80 batches | 92796/112472 positions | 523s elapsed | ~177 pos/s | ETA ~111s
+  [label] 67/80 batches | 94202/112472 positions | 524s elapsed | ~180 pos/s | ETA ~102s
+  [label] 68/80 batches | 95608/112472 positions | 524s elapsed | ~182 pos/s | ETA ~92s
+  [label] 69/80 batches | 97014/112472 positions | 526s elapsed | ~185 pos/s | ETA ~84s
+  [label] 70/80 batches | 98420/112472 positions | 526s elapsed | ~187 pos/s | ETA ~75s
+  [label] 71/80 batches | 99826/112472 positions | 526s elapsed | ~190 pos/s | ETA ~67s
+  [label] 72/80 batches | 101232/112472 positions | 527s elapsed | ~192 pos/s | ETA ~58s
+  [label] 73/80 batches | 102638/112472 positions | 528s elapsed | ~195 pos/s | ETA ~51s
+  [label] 74/80 batches | 104044/112472 positions | 528s elapsed | ~197 pos/s | ETA ~43s
+  [label] 75/80 batches | 105450/112472 positions | 529s elapsed | ~199 pos/s | ETA ~35s
+  [label] 76/80 batches | 106856/112472 positions | 531s elapsed | ~201 pos/s | ETA ~28s
+  [label] 77/80 batches | 108262/112472 positions | 531s elapsed | ~204 pos/s | ETA ~21s
+  [label] 78/80 batches | 109668/112472 positions | 531s elapsed | ~206 pos/s | ETA ~14s
+  [label] 79/80 batches | 111074/112472 positions | 532s elapsed | ~209 pos/s | ETA ~7s
+  [label] 80/80 batches | 112472/112472 positions | 535s elapsed | ~210 pos/s | ETA ~0s
+Labeled 112472 positions in 535.8s
+
+Step 3: writing runs/run_06/data/iter12_raw.csv...
+Saved 112472 training examples to runs/run_06/data/iter12_raw.csv
+
+Eval column (white pov, pawns):
+  mean 0.66  std 46.66  min -99.99  max 100.00
+
+[Step 2/4] Mixing with foundation data (30% foundation)...
+Mixing datasets...
+  Foundation: ../attempt_02/training_data_augmented.csv
+  New data: runs/run_06/data/iter12_raw.csv
+  Foundation ratio: 30.0%
+  Val split: 10.0%
+
+Loading datasets...
+  Foundation: 3600000 examples
+  New data: 112472 examples
+  Sampled foundation: 48202 examples
+  Mixed total: 160674 examples
+  Train: 144606 examples
+  Val: 16068 examples
+
+Saving...
+✓ Saved train to: runs/run_06/data/iter12_train.csv
+✓ Saved val to: runs/run_06/data/iter12_val.csv
+
+Final statistics:
+  Train - Foundation: 43509 (30.1%)
+  Train - New: 101097 (69.9%)
+
+[Step 3/4] Training model...
+================================================================================
+SUPERVISED TRAINING FROM STOCKFISH LABELS
+================================================================================
+Train data:   runs/run_06/data/iter12_train.csv
+Val data:     runs/run_06/data/iter12_val.csv
+Initial model:runs/run_06/models/model_M11.pth
+Output dir:   runs/run_06/models/iter12
+Epochs=3  batch=256  lr=0.0001  policy_weight=1.0  device=cuda
+
+Loading runs/run_06/data/iter12_train.csv...
+Precomputing 144,606 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 144,606 / 144,606 positions...
+Done. Board tensors shape: torch.Size([144606, 18, 8, 8])
+Policy indices shape: torch.Size([144606, 5]) (sparse, ~2.9 MB)
+Legal move indices shape: torch.Size([144606, 128]) (sparse, ~37.0 MB)
+Positions with policy targets: 136,206 / 144,606 (94.2%)
+Loading runs/run_06/data/iter12_val.csv...
+Precomputing 16,068 board tensors...
+  (Also computing legal move indices for policy masking)
+  Using 16 precompute worker(s), chunk size 4,096
+  Processed 16,068 / 16,068 positions...
+Done. Board tensors shape: torch.Size([16068, 18, 8, 8])
+Policy indices shape: torch.Size([16068, 5]) (sparse, ~0.3 MB)
+Legal move indices shape: torch.Size([16068, 128]) (sparse, ~4.1 MB)
+Positions with policy targets: 15,097 / 16,068 (94.0%)
+Train batches: 565  Val batches: 63
+Loading weights from runs/run_06/models/model_M11.pth
+Epoch 01/3  train 1.9539 (v 0.0386 p 1.9153)  |  val 2.0837 (v 0.0408 p 2.0428)  mae 8.66  top3/5 76.7%/86.9%
+  -> new best (val loss 2.0837)
+Epoch 02/3  train 1.8412 (v 0.0340 p 1.8072)  |  val 2.0952 (v 0.0390 p 2.0561)  mae 7.97  top3/5 76.3%/86.6%
+Epoch 03/3  train 1.7690 (v 0.0304 p 1.7386)  |  val 2.1169 (v 0.0397 p 2.0772)  mae 8.36  top3/5 76.0%/86.4%
+
+Training complete. Best val loss 2.0837. Checkpoints in runs/run_06/models/iter12
+
+[Step 4/4] Evaluating candidate (M12) vs Stockfish level 3...
+================================================================================
+EVALUATING MODEL VS STOCKFISH
+================================================================================
+Model: runs/run_06/models/model_M12.pth
+Stockfish level: 3  time: 0.1s/move  games: 100  move selection: 1-ply value search  model temperature: 0.1  workers: 20
+
+  (running 100 games across 20 worker process(es) on cuda)
+  [eval] 10/100 games done
+  [eval] 20/100 games done
+  [eval] 30/100 games done
+  [eval] 40/100 games done
+  [eval] 50/100 games done
+  [eval] 60/100 games done
+  [eval] 70/100 games done
+  [eval] 80/100 games done
+  [eval] 90/100 games done
+  [eval] 100/100 games done
+
+================================================================================
+RESULTS
+================================================================================
+Total games: 100
+Wins:   11 (11.0%)
+Draws:  18 (18.0%)
+Losses: 71 (71.0%)
+Score:  0.200 (20.0%)
+Estimated ELO difference vs SF L3: -241
+
+================================================================================
+PROMOTION DECISION (Level 3)
+================================================================================
+  Baseline:          0.245 (24.5%)
+  Candidate (M12): 0.200 (20.0%)
+  Improvement:       -0.045 (-4.5%)
+
+✗ REJECTED. Candidate does not beat baseline.
+  best_model_path retained; trunk continues from M12 (no reset)
+
+⏱  Iteration 12: play 325s · label 536s · mix 104s · train 40s · eval 55s · total 1064s (17.7 min)
+
+================================================================================
+ITERATION 13/50  (Stockfish level 3)
+================================================================================
+
+[Step 1/4] Generating training data...
+Generating training data with Stockfish labeling...
+  Games: 1000  Move selection: 1-ply value search  Temperature: 0.8  Max plies/game: 160
+  SF budget: 0.1s/position (depth<=20 ceiling)  multi-PV: 5  Workers: 20  Hash: 128MB/worker
+  Model: runs/run_06/models/model_M12.pth
+  Output: runs/run_06/data/iter13_raw.csv
+  Self-play PGN: runs/run_06/games/iter13.pgn
+
+Step 1: playing games (1-ply value search)...
+  (playing 1000 games across 20 worker process(es) on cuda)
+  [play] 100/1000 games done | 10781 positions
+  [play] 200/1000 games done | 22281 positions
+  [play] 300/1000 games done | 33867 positions
+  [play] 400/1000 games done | 45687 positions
+  [play] 500/1000 games done | 57087 positions
+  [play] 600/1000 games done | 68328 positions
+  [play] 700/1000 games done | 78797 positions
+  [play] 800/1000 games done | 90231 positions
+  [play] 900/1000 games done | 101139 positions
+  [play] 1000/1000 games done | 113292 positions
+  Collected 113292 positions (109474 unique) from 1000 games in 317.6s
+  Average plies per game: 113.3
+  Saved 1000 self-play games to runs/run_06/games/iter13.pgn
+
+Step 2: labeling positions with Stockfish...
+  [label] 1/80 batches | 1369/109474 positions | 121s elapsed | ~11 pos/s | ETA ~9564s
+  [label] 2/80 batches | 2738/109474 positions | 122s elapsed | ~23 pos/s | ETA ~4740s
+  [label] 3/80 batches | 4107/109474 positions | 122s elapsed | ~34 pos/s | ETA ~3127s
+  [label] 4/80 batches | 5476/109474 positions | 123s elapsed | ~45 pos/s | ETA ~2336s
+  [label] 5/80 batches | 6845/109474 positions | 124s elapsed | ~55 pos/s | ETA ~1854s
+  [label] 6/80 batches | 8214/109474 positions | 124s elapsed | ~66 pos/s | ETA ~1533s
+  [label] 7/80 batches | 9583/109474 positions | 124s elapsed | ~77 pos/s | ETA ~1297s
+  [label] 8/80 batches | 10952/109474 positions | 126s elapsed | ~87 pos/s | ETA ~1134s
+  [label] 9/80 batches | 12321/109474 positions | 127s elapsed | ~97 pos/s | ETA ~999s
+  [label] 10/80 batches | 13690/109474 positions | 127s elapsed | ~108 pos/s | ETA ~891s
+  [label] 11/80 batches | 15059/109474 positions | 129s elapsed | ~117 pos/s | ETA ~809s
+  [label] 12/80 batches | 16428/109474 positions | 130s elapsed | ~127 pos/s | ETA ~734s
+  [label] 13/80 batches | 17797/109474 positions | 130s elapsed | ~137 pos/s | ETA ~669s
+  [label] 14/80 batches | 19166/109474 positions | 130s elapsed | ~147 pos/s | ETA ~613s
+  [label] 15/80 batches | 20535/109474 positions | 131s elapsed | ~157 pos/s | ETA ~567s
+  [label] 16/80 batches | 21904/109474 positions | 132s elapsed | ~165 pos/s | ETA ~530s
+  [label] 17/80 batches | 23273/109474 positions | 133s elapsed | ~174 pos/s | ETA ~494s
+  [label] 18/80 batches | 24642/109474 positions | 134s elapsed | ~183 pos/s | ETA ~463s
+  [label] 19/80 batches | 26011/109474 positions | 135s elapsed | ~193 pos/s | ETA ~432s
+  [label] 20/80 batches | 27380/109474 positions | 137s elapsed | ~200 pos/s | ETA ~410s
+  [label] 21/80 batches | 28749/109474 positions | 248s elapsed | ~116 pos/s | ETA ~696s
+  [label] 22/80 batches | 30118/109474 positions | 248s elapsed | ~121 pos/s | ETA ~655s
+  [label] 23/80 batches | 31487/109474 positions | 249s elapsed | ~127 pos/s | ETA ~616s
+  [label] 24/80 batches | 32856/109474 positions | 249s elapsed | ~132 pos/s | ETA ~581s
+  [label] 25/80 batches | 34225/109474 positions | 251s elapsed | ~137 pos/s | ETA ~551s
+  [label] 26/80 batches | 35594/109474 positions | 252s elapsed | ~141 pos/s | ETA ~524s
+  [label] 27/80 batches | 36963/109474 positions | 252s elapsed | ~147 pos/s | ETA ~495s
+  [label] 28/80 batches | 38332/109474 positions | 253s elapsed | ~152 pos/s | ETA ~469s
+  [label] 29/80 batches | 39701/109474 positions | 254s elapsed | ~156 pos/s | ETA ~446s
+  [label] 30/80 batches | 41070/109474 positions | 254s elapsed | ~161 pos/s | ETA ~424s
+  [label] 31/80 batches | 42439/109474 positions | 255s elapsed | ~166 pos/s | ETA ~403s
+  [label] 32/80 batches | 43808/109474 positions | 257s elapsed | ~171 pos/s | ETA ~385s
+  [label] 33/80 batches | 45177/109474 positions | 258s elapsed | ~175 pos/s | ETA ~367s
+  [label] 34/80 batches | 46546/109474 positions | 258s elapsed | ~180 pos/s | ETA ~349s
+  [label] 35/80 batches | 47915/109474 positions | 259s elapsed | ~185 pos/s | ETA ~333s
+  [label] 36/80 batches | 49284/109474 positions | 259s elapsed | ~190 pos/s | ETA ~317s
+  [label] 37/80 batches | 50653/109474 positions | 263s elapsed | ~193 pos/s | ETA ~305s
+  [label] 38/80 batches | 52022/109474 positions | 263s elapsed | ~198 pos/s | ETA ~291s
+  [label] 39/80 batches | 53391/109474 positions | 266s elapsed | ~201 pos/s | ETA ~279s
+  [label] 40/80 batches | 54760/109474 positions | 269s elapsed | ~203 pos/s | ETA ~269s
+/usr/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
