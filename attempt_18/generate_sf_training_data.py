@@ -8,14 +8,16 @@ Generates training data by:
 
    fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5
 
-   - eval  : position evaluation in PAWNS, from WHITE's perspective
-             (matches the foundation dataset and the ChessNet value head, which
-             chess_engine.ChessDataset feeds straight through normalize_eval()).
+   - eval  : position evaluation in PAWNS, from WHITE's perspective.
    - moveN : UCI strings for Stockfish's top-N principal variations.
-   - scoreN: evaluation in CENTIPAWNS after that move, from the SIDE-TO-MOVE's
-             perspective, so the best move always has the highest score. This is
-             what chess_engine.moves_to_policy_sparse() expects, and matches the
-             foundation dataset.
+   - scoreN: WHITE-POV evaluation DELTA in PAWNS after the move, i.e.
+             score_i = move_eval_white - eval. Positive deltas mean the move
+             makes White's position better; negative deltas mean it makes
+             White's position worse. This matches the convention produced by
+             attempt_02/augment_with_top_moves.py (the foundation dataset).
+             The downstream loader (chess_engine.moves_to_policy_sparse) flips
+             the sign on Black's turn so that the best move for the side to
+             move always softmaxes to the highest probability.
 
 Labeling cost is controlled by --sf-time / --sf-nodes / --sf-depth. Depth-only
 search blows up on the messy positions a weak policy net reaches, so the default
@@ -84,7 +86,8 @@ MATE_PAWNS_CLAMP = 100.0  # clamp the white-pov eval column to +/- this (pawns)
 # Step 1: play games with the network
 # ---------------------------------------------------------------------------
 
-def play_game_with_policy(model, device, temperature=0.8, max_moves=160, search_depth=1):
+def play_game_with_policy(model, device, temperature=0.05, max_moves=160, search_depth=1,
+                          early_temperature_plies=5):
     """
     Play one self-play game with the network.
 
@@ -106,7 +109,8 @@ def play_game_with_policy(model, device, temperature=0.8, max_moves=160, search_
     model.eval()
     while not board.is_game_over(claim_draw=True) and len(board.move_stack) < max_moves:
         positions.append(board.fen())
-        board.push(choose_move(model, board, device, search_depth, temperature))
+        t = temperature if len(board.move_stack) < early_temperature_plies else 0.0
+        board.push(choose_move(model, board, device, search_depth, t))
     result = board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
     moves_uci = [mv.uci() for mv in board.move_stack]
     return positions, {"moves": moves_uci, "result": result, "plies": len(moves_uci)}
@@ -172,11 +176,13 @@ def _gen_worker_init(model_path: str, device: str):
 
 
 def _gen_worker_play(args):
-    _game_idx, temperature, max_moves, search_depth = args
-    return play_game_with_policy(_GEN_MODEL, _GEN_DEVICE, temperature, max_moves, search_depth)
+    _game_idx, temperature, max_moves, search_depth, early_temperature_plies = args
+    return play_game_with_policy(_GEN_MODEL, _GEN_DEVICE, temperature, max_moves, search_depth,
+                                 early_temperature_plies=early_temperature_plies)
 
 
-def _play_games_parallel(model_path, device, num_games, temperature, max_moves, num_workers, search_depth):
+def _play_games_parallel(model_path, device, num_games, temperature, max_moves, num_workers, search_depth,
+                         early_temperature_plies):
     """Play num_games across num_workers processes; return (flat list of visited FENs, list of game records)."""
     n = max(1, min(int(num_workers), num_games))
     # 'spawn' so each worker gets a clean CUDA context (the parent may already
@@ -194,7 +200,8 @@ def _play_games_parallel(model_path, device, num_games, temperature, max_moves, 
                                    initializer=_gen_worker_init,
                                    initargs=(model_path, device))
     try:
-        futures = [executor.submit(_gen_worker_play, (gi, temperature, max_moves, search_depth))
+        futures = [executor.submit(_gen_worker_play,
+                                   (gi, temperature, max_moves, search_depth, early_temperature_plies))
                    for gi in range(num_games)]
         done = 0
         for future in as_completed(futures):
@@ -268,23 +275,29 @@ def label_positions_batch(positions, sf_path, sf_time=0.1, sf_depth=0, sf_nodes=
             if isinstance(info, dict):  # defensive: some versions return a dict for multipv=1
                 info = [info]
 
-            moves = []
-            for pv in info:
-                pv_line = pv.get("pv")
-                if not pv_line:
-                    continue
-                score_cp = pv["score"].relative.score(mate_score=MATE_CP)
-                if score_cp is None:
-                    continue
-                moves.append((pv_line[0].uci(), int(score_cp)))
-            if not moves:
-                continue
-
             white_cp = info[0]["score"].white().score(mate_score=MATE_CP)
             if white_cp is None:
                 continue
             eval_pawns = white_cp / 100.0
             eval_pawns = max(-MATE_PAWNS_CLAMP, min(MATE_PAWNS_CLAMP, eval_pawns))
+
+            # Foundation convention: per-move score is the white-POV pawn DELTA
+            # from the position's base eval. The loader flips sign on Black's
+            # turn, so storing white-POV here keeps the data symmetric.
+            moves = []
+            for pv in info:
+                pv_line = pv.get("pv")
+                if not pv_line:
+                    continue
+                move_white_cp = pv["score"].white().score(mate_score=MATE_CP)
+                if move_white_cp is None:
+                    continue
+                move_white_pawns = move_white_cp / 100.0
+                move_white_pawns = max(-MATE_PAWNS_CLAMP, min(MATE_PAWNS_CLAMP, move_white_pawns))
+                delta = round(move_white_pawns - eval_pawns, 2)
+                moves.append((pv_line[0].uci(), delta))
+            if not moves:
+                continue
 
             rows.append((fen, eval_pawns, moves))
     finally:
@@ -315,7 +328,8 @@ def generate_training_data(
     stockfish_path: str,
     num_games: int = 100,
     num_workers: int = 8,
-    temperature: float = 0.8,
+    temperature: float = 0.05,
+    early_temperature_plies: int = 5,
     sf_depth: int = 20,
     sf_multipv: int = 5,
     sf_time: float = 0.1,
@@ -330,7 +344,9 @@ def generate_training_data(
     move_desc = (f"{search_depth}-ply value search" if search_depth and search_depth >= 1
                  else "policy head only")
     print("Generating training data with Stockfish labeling...")
-    print(f"  Games: {num_games}  Move selection: {move_desc}  Temperature: {temperature}  Max plies/game: {max_moves}")
+    print(f"  Games: {num_games}  Move selection: {move_desc}  "
+          f"Temperature: {temperature} (first {early_temperature_plies} plies, then argmax)  "
+          f"Max plies/game: {max_moves}")
     print(f"  SF budget: {limit_desc}  multi-PV: {sf_multipv}  Workers: {num_workers}  Hash: {sf_hash}MB/worker")
     print(f"  Model: {model_path}")
     print(f"  Output: {output_path}")
@@ -348,7 +364,8 @@ def generate_training_data(
         # Parallel: worker processes load their own model; the parent stays
         # CUDA-free here, which keeps the 'spawn' pool clean.
         all_positions, games = _play_games_parallel(
-            model_path, device, num_games, temperature, max_moves, num_workers, search_depth
+            model_path, device, num_games, temperature, max_moves, num_workers, search_depth,
+            early_temperature_plies=early_temperature_plies,
         )
     else:
         device_torch = torch.device(device)
@@ -359,7 +376,8 @@ def generate_training_data(
         model.eval()
         all_positions = []
         for _ in tqdm(range(num_games), desc="Playing games"):
-            positions, game_rec = play_game_with_policy(model, device_torch, temperature, max_moves, search_depth)
+            positions, game_rec = play_game_with_policy(model, device_torch, temperature, max_moves, search_depth,
+                                                        early_temperature_plies=early_temperature_plies)
             all_positions.extend(positions)
             games.append(game_rec)
 
@@ -457,7 +475,10 @@ if __name__ == "__main__":
     parser.add_argument("--stockfish", type=str, required=True, help="Path to Stockfish binary")
     parser.add_argument("--games", type=int, default=100, help="Number of games to generate")
     parser.add_argument("--workers", type=int, default=8, help="Number of parallel labeling workers (Stockfish is 1 thread each)")
-    parser.add_argument("--temperature", type=float, default=0.8, help="Policy sampling temperature")
+    parser.add_argument("--temperature", type=float, default=0.05,
+                        help="Policy sampling temperature (used only for the first --early-temperature-plies plies; argmax thereafter)")
+    parser.add_argument("--early-temperature-plies", type=int, default=5,
+                        help="Number of opening plies that use --temperature; subsequent plies use argmax (0 = argmax everywhere)")
     parser.add_argument("--sf-time", type=float, default=0.1, help="Seconds of Stockfish per position (0 to disable; default 0.1)")
     parser.add_argument("--sf-nodes", type=int, default=0, help="Stockfish nodes per position (overrides --sf-time/--sf-depth if >0)")
     parser.add_argument("--sf-depth", type=int, default=20, help="Stockfish depth: a search ceiling when --sf-time>0, or the budget when --sf-time=0")
@@ -478,6 +499,7 @@ if __name__ == "__main__":
         num_games=args.games,
         num_workers=args.workers,
         temperature=args.temperature,
+        early_temperature_plies=args.early_temperature_plies,
         sf_depth=args.sf_depth,
         sf_multipv=args.sf_multipv,
         sf_time=args.sf_time,

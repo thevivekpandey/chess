@@ -26,9 +26,12 @@ Outputs:
 
 Training Data Format (CSV):
 fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5
-- eval: position evaluation in pawns
+- eval: position evaluation in pawns, white-POV
 - moveN: UCI format moves (e.g., "e2e4")
-- scoreN: score change in centipawns after the move
+- scoreN: white-POV pawn DELTA from `eval` after the move
+          (i.e. move_eval_white - eval). Positive = move improves White's
+          position; negative = move worsens it. moves_to_policy_sparse flips
+          sign on Black's turn so the best move always softmaxes to the top.
 """
 
 import logging
@@ -531,42 +534,51 @@ MAX_POLICY_MOVES = 5  # Maximum number of moves to store per position
 def moves_to_policy_sparse(
     moves: List[str],
     scores: List[float],
+    turn: bool,
     temperature: float = 1.0
 ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     """
     Convert moves and scores to sparse policy representation.
 
     Args:
-        moves: List of UCI move strings
-        scores: List of scores in centipawns
-        temperature: Softmax temperature for score conversion
+        moves: List of UCI move strings.
+        scores: List of scores in PAWNS, WHITE-POV (foundation convention - the
+                CSV stores `move_eval_white - base_eval_white`). Whether the
+                values are absolute or deltas doesn't matter for softmax (it's
+                shift-invariant); what matters is that they're in pawns and
+                expressed from White's perspective.
+        turn: True for White to move, False for Black (use chess.WHITE /
+              chess.BLACK). Used to flip the sign so the best move for the
+              side to move ends up with the largest pre-softmax value.
+        temperature: Softmax temperature, in pawns.
 
     Returns:
         Tuple of (indices, weights) arrays, each of length MAX_POLICY_MOVES,
         or None if no valid moves. Unused slots have index -1 and weight 0.
     """
-    # Filter valid moves (non-empty, not -9999 blunders)
     valid_flat_indices = []
     valid_scores = []
 
     for move, score in zip(moves, scores):
-        if move and score > -9000:  # Filter out -9999 blunders
-            idx = move_to_policy_index(move)
-            if idx is not None:
-                src_row, src_col, plane = idx
-                # Flatten to single index: plane * 64 + row * 8 + col
-                flat_idx = plane * 64 + src_row * 8 + src_col
-                valid_flat_indices.append(flat_idx)
-                valid_scores.append(score)
+        if not move:
+            continue
+        idx = move_to_policy_index(move)
+        if idx is not None:
+            src_row, src_col, plane = idx
+            # Flatten to single index: plane * 64 + row * 8 + col
+            flat_idx = plane * 64 + src_row * 8 + src_col
+            valid_flat_indices.append(flat_idx)
+            valid_scores.append(score)
 
     if not valid_flat_indices:
         return None
 
-    # Convert scores to probabilities using softmax
-    scores_array = np.array(valid_scores, dtype=np.float32)
-    # Scale by temperature (scores are in centipawns, divide by 100 to get pawns first)
-    scores_scaled = (scores_array / 100.0) / temperature
-    # Softmax
+    # White-POV pawns -> orient to side-to-move so the best move has the largest
+    # value, then softmax. (Sign flip is what makes black's best move "win" the
+    # max instead of becoming the most-suppressed entry.)
+    sign = 1.0 if turn else -1.0
+    scores_array = np.array(valid_scores, dtype=np.float32) * sign
+    scores_scaled = scores_array / temperature
     exp_scores = np.exp(scores_scaled - np.max(scores_scaled))
     probs = exp_scores / np.sum(exp_scores)
 
@@ -864,7 +876,9 @@ def _precompute_dataset_chunk(args):
         eval_tensors[local_idx, 0] = normalize_eval(eval_pawns, max_pawns)
 
         if moves:
-            sparse_result = moves_to_policy_sparse(moves, scores, policy_temperature)
+            # FEN's second whitespace-separated field is the side to move ('w'/'b').
+            turn = fen.split()[1] == 'w'
+            sparse_result = moves_to_policy_sparse(moves, scores, turn, policy_temperature)
             if sparse_result is not None:
                 indices, weights = sparse_result
                 policy_indices[local_idx] = indices
@@ -1088,8 +1102,8 @@ def load_data_from_csv(filename: str) -> List[Tuple[str, float, List[str], List[
 
     Expected format: CSV with header
     "fen,eval,move1,score1,move2,score2,move3,score3,move4,score4,move5,score5"
-    - eval is in pawn units
-    - scores are in centipawns
+    - eval is in pawns (white-POV)
+    - scores are white-POV pawn deltas from eval (foundation convention)
     Mate scores are represented as +100 or -100.
 
     Args:

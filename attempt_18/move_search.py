@@ -37,7 +37,7 @@ from chess_engine import board_to_tensor, move_to_policy_index
 # Sentinel just outside the value head's [-1, 1] range so a mate dominates
 # any heuristic eval after sign-flipping through negamax.
 _TERMINAL_WIN = 2.0
-_ARGMAX_TEMP = 0.2
+_ARGMAX_TEMP = 0.01
 
 # Top-K branching cap at every interior node during k-ply search.  Tune via
 # benchmark_play.py: bigger = more thorough, smaller = faster.  At depth=2

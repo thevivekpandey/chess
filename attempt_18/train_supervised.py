@@ -91,8 +91,22 @@ def train_supervised(
         policy_weight=policy_weight,
     )
 
-    best_val_loss = float("inf")
     final_epoch_path = os.path.join(output_path, f"model_epoch_{num_epochs}.pth")
+
+    # Pre-training validation (epoch 00). If no training epoch beats this,
+    # model_best.pth ends up identical to the input checkpoint and the pipeline
+    # can skip re-evaluating it against Stockfish.
+    val_metrics_0 = trainer.validate(val_loader)
+    print(
+        f"Epoch 00/{num_epochs}  (pre-training)              "
+        f"val {val_metrics_0['loss']:.4f} (v {val_metrics_0['value_loss']:.4f} "
+        f"p {val_metrics_0['policy_loss']:.4f})  "
+        f"mae {val_metrics_0['mae_pawns']:.2f}  "
+        f"top3/5 {val_metrics_0['top3_acc']:.1%}/{val_metrics_0['top5_acc']:.1%}"
+    )
+    best_val_loss = val_metrics_0["loss"]
+    best_epoch = 0
+    trainer.save_model(os.path.join(output_path, "model_best.pth"))
 
     for epoch in range(1, num_epochs + 1):
         train_metrics = trainer.train_epoch(train_loader)
@@ -113,6 +127,7 @@ def train_supervised(
             trainer.save_model(os.path.join(output_path, f"model_epoch_{epoch}.pth"))
         if val_metrics["loss"] < best_val_loss:
             best_val_loss = val_metrics["loss"]
+            best_epoch = epoch
             trainer.save_model(os.path.join(output_path, "model_best.pth"))
             print(f"  -> new best (val loss {best_val_loss:.4f})")
 
@@ -121,7 +136,22 @@ def train_supervised(
     if not os.path.exists(final_epoch_path):
         trainer.save_model(final_epoch_path)
 
-    print(f"\nTraining complete. Best val loss {best_val_loss:.4f}. Checkpoints in {output_path}")
+    if best_epoch == 0:
+        print(
+            f"\nTraining complete. Best val loss {best_val_loss:.4f} from epoch 00 "
+            f"(pre-training); no training epoch improved on it."
+        )
+    else:
+        print(
+            f"\nTraining complete. Best val loss {best_val_loss:.4f} at epoch {best_epoch:02d}. "
+            f"Checkpoints in {output_path}"
+        )
+
+    return {
+        "best_epoch": best_epoch,
+        "best_val_loss": best_val_loss,
+        "epoch_0_val_loss": val_metrics_0["loss"],
+    }
 
 
 if __name__ == "__main__":

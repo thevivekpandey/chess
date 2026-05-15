@@ -20,6 +20,7 @@ from typing import Dict, List
 
 import chess
 import chess.engine
+import chess.pgn
 import numpy as np
 import torch
 
@@ -71,6 +72,37 @@ class GameResult:
     moves: int
     white_player: str
     black_player: str
+    move_ucis: List[str]
+
+
+def _write_eval_games_pgn(results, path, stockfish_level, search_depth, model_temperature):
+    if not results:
+        return 0
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w") as f:
+        for i, r in enumerate(results, 1):
+            game = chess.pgn.Game()
+            game.headers["Event"] = f"eval vs Stockfish L{stockfish_level}"
+            game.headers["Site"] = "attempt_18"
+            game.headers["Round"] = str(i)
+            game.headers["White"] = r.white_player
+            game.headers["Black"] = r.black_player
+            game.headers["Result"] = r.result
+            game.headers["PlyCount"] = str(r.moves)
+            game.headers["SearchDepth"] = str(search_depth)
+            game.headers["ModelTemperature"] = f"{model_temperature:g}"
+            node = game
+            for uci in r.move_ucis:
+                try:
+                    node = node.add_variation(chess.Move.from_uci(uci))
+                except ValueError:
+                    break
+            print(game, file=f, end="\n\n")
+    return len(results)
+
+
+def _model_color_from_result(r):
+    return chess.WHITE if r.white_player == "Model" else chess.BLACK
 
 
 def play_game_vs_stockfish(
@@ -80,7 +112,7 @@ def play_game_vs_stockfish(
     model_color: chess.Color,
     stockfish_level: int = 10,
     stockfish_time: float = 0.1,
-    model_temperature: float = 0.1,
+    model_temperature: float = 0.0,
     max_moves: int = 200,
     search_depth: int = 1,
 ) -> GameResult:
@@ -111,7 +143,8 @@ def play_game_vs_stockfish(
     white_player = "Model" if model_color == chess.WHITE else f"SF_L{stockfish_level}"
     black_player = f"SF_L{stockfish_level}" if model_color == chess.WHITE else "Model"
     return GameResult(result=result_str, moves=len(board.move_stack),
-                      white_player=white_player, black_player=black_player)
+                      white_player=white_player, black_player=black_player,
+                      move_ucis=[mv.uci() for mv in board.move_stack])
 
 
 def _model_outcome_value(result: str, model_color: chess.Color) -> float:
@@ -152,16 +185,15 @@ def _eval_worker_init(model_path: str, device: str):
 def _eval_worker_play(args):
     game_idx, stockfish_path, stockfish_level, stockfish_time, model_temperature, search_depth = args
     model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
-    result = play_game_vs_stockfish(
+    return play_game_vs_stockfish(
         _WORKER_MODEL, stockfish_path, _WORKER_DEVICE, model_color,
         stockfish_level, stockfish_time, model_temperature, search_depth=search_depth,
     )
-    return _model_outcome_value(result.result, model_color)
 
 
 def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
                          stockfish_time, model_temperature, num_workers, device, search_depth):
-    """Play num_games across num_workers processes; return (wins, draws, losses)."""
+    """Play num_games across num_workers processes; return list of GameResult."""
     n = max(1, min(int(num_workers), num_games))
     # 'spawn' so each worker gets a clean CUDA context (the parent may already
     # have initialized CUDA - forking that would break torch in the child).
@@ -170,7 +202,7 @@ def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
     except ValueError:
         ctx = None
     print(f"  (running {num_games} games across {n} worker process(es) on {device})", flush=True)
-    outcomes = []
+    results: List[GameResult] = []
     report_every = max(1, num_games // 10)
     executor = ProcessPoolExecutor(max_workers=n, mp_context=ctx,
                                    initializer=_eval_worker_init,
@@ -182,21 +214,18 @@ def _play_games_parallel(model_path, stockfish_path, num_games, stockfish_level,
             for gi in range(num_games)
         ]
         for fut in as_completed(futures):
-            outcomes.append(fut.result())
-            done = len(outcomes)
+            results.append(fut.result())
+            done = len(results)
             if done % report_every == 0 or done == num_games:
                 print(f"  [eval] {done}/{num_games} games done", flush=True)
     finally:
         _terminate_pool(executor)
-    wins = sum(1 for v in outcomes if v == 1.0)
-    draws = sum(1 for v in outcomes if v == 0.5)
-    losses = sum(1 for v in outcomes if v == 0.0)
-    return wins, draws, losses
+    return results
 
 
 def _play_games_sequential(model_path, stockfish_path, num_games, stockfish_level,
                            stockfish_time, model_temperature, device, search_depth):
-    """Play num_games sequentially in-process (model on `device`); return (wins, draws, losses)."""
+    """Play num_games sequentially in-process (model on `device`); return list of GameResult."""
     device_torch = torch.device(device)
     model = ChessNet()
     checkpoint = torch.load(model_path, map_location=device_torch, weights_only=False)
@@ -204,21 +233,14 @@ def _play_games_sequential(model_path, stockfish_path, num_games, stockfish_leve
     model.to(device_torch)
     model.eval()
 
-    wins = draws = losses = 0
+    results: List[GameResult] = []
     for game_idx in tqdm(range(num_games), desc="Playing games"):
         model_color = chess.WHITE if game_idx % 2 == 0 else chess.BLACK
-        result = play_game_vs_stockfish(
+        results.append(play_game_vs_stockfish(
             model, stockfish_path, device_torch, model_color,
             stockfish_level, stockfish_time, model_temperature, search_depth=search_depth,
-        )
-        v = _model_outcome_value(result.result, model_color)
-        if v == 1.0:
-            wins += 1
-        elif v == 0.5:
-            draws += 1
-        else:
-            losses += 1
-    return wins, draws, losses
+        ))
+    return results
 
 
 def evaluate_model(
@@ -227,10 +249,11 @@ def evaluate_model(
     num_games: int = 100,
     stockfish_level: int = 10,
     stockfish_time: float = 0.1,
-    model_temperature: float = 0.1,
+    model_temperature: float = 0.0,
     device: str = "cuda",
     num_workers: int = 1,
     search_depth: int = 1,
+    save_pgn_path: str = None,
 ) -> Dict:
     move_desc = f"{search_depth}-ply value search" if search_depth and search_depth >= 1 else "policy head only"
     print("=" * 80)
@@ -242,15 +265,30 @@ def evaluate_model(
     print()
 
     if num_workers and num_workers > 1 and num_games > 1:
-        wins, draws, losses = _play_games_parallel(
+        results = _play_games_parallel(
             model_path, stockfish_path, num_games, stockfish_level,
             stockfish_time, model_temperature, num_workers, device, search_depth,
         )
     else:
-        wins, draws, losses = _play_games_sequential(
+        results = _play_games_sequential(
             model_path, stockfish_path, num_games, stockfish_level,
             stockfish_time, model_temperature, device, search_depth,
         )
+
+    wins = draws = losses = 0
+    for r in results:
+        v = _model_outcome_value(r.result, _model_color_from_result(r))
+        if v == 1.0:
+            wins += 1
+        elif v == 0.5:
+            draws += 1
+        else:
+            losses += 1
+
+    if save_pgn_path:
+        n_written = _write_eval_games_pgn(results, save_pgn_path,
+                                          stockfish_level, search_depth, model_temperature)
+        print(f"  Saved {n_written} eval games to {save_pgn_path}", flush=True)
 
     total_games = wins + draws + losses
     win_rate = wins / total_games if total_games else 0.0
@@ -323,7 +361,8 @@ if __name__ == "__main__":
     parser.add_argument("--games", type=int, default=100, help="Number of games")
     parser.add_argument("--level", type=int, default=10, help="Stockfish skill level (0-20)")
     parser.add_argument("--sf-time", type=float, default=0.1, help="Stockfish time per move (s)")
-    parser.add_argument("--temperature", type=float, default=0.1, help="Model sampling temperature (<=0.2 => deterministic argmax)")
+    parser.add_argument("--temperature", type=float, default=0.0,
+                        help="Model sampling temperature (<=0.01 => deterministic argmax; eval defaults to argmax)")
     parser.add_argument("--search-depth", type=int, default=1,
                         help="Plies of value-head negamax for the model's move selection (1 = pick by best resulting position; 0 = policy head only)")
     parser.add_argument("--workers", type=int, default=8, help="Parallel game-playing workers")

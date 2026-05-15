@@ -142,6 +142,13 @@ def run_pipeline(
     level_start_iteration = 1  # Iteration on which the current SF level began
     level_history = []  # Track level progressions
 
+    # Cached eval stats for the current trunk model (current_model_path).
+    # Populated by the baseline eval at level start AND by each iteration's
+    # candidate eval. When training fails to improve val loss, the candidate
+    # equals the trunk model, so we reuse this score instead of re-running
+    # ~`eval_games` games against Stockfish.
+    trunk_stats = None
+
     # Log results
     results_log = []
 
@@ -183,10 +190,14 @@ def run_pipeline(
                 stockfish_time=0.1,
                 device=device,
                 num_workers=num_workers,
-                search_depth=search_depth
+                search_depth=search_depth,
+                save_pgn_path=os.path.join(games_dir, f"iter{iteration}_baseline_eval.pgn"),
             )
             timings['baseline_eval'] = time.time() - t
             baseline_score = baseline_stats['score']
+            # The baseline eval just measured best_model_path, which is also
+            # the trunk (current_model_path) at level start.
+            trunk_stats = baseline_stats
             print(f"  Baseline: {baseline_score:.3f} ({baseline_score:.1%})  [eval took {timings['baseline_eval']:.0f}s]")
 
             if baseline_score > 0.60:
@@ -225,7 +236,8 @@ def run_pipeline(
             stockfish_path=stockfish_path,
             num_games=games_per_iteration,
             num_workers=num_workers,
-            temperature=0.8,
+            temperature=0.05,
+            early_temperature_plies=5,
             sf_depth=sf_depth,
             sf_multipv=sf_multipv,
             sf_time=sf_time,
@@ -282,7 +294,7 @@ def run_pipeline(
         iter_models_dir = os.path.join(models_dir, f"iter{iteration}")
 
         t = time.time()
-        train_supervised(
+        train_info = train_supervised(
             train_data_path=train_data_path,
             val_data_path=val_data_path,
             model_path=current_model_path,
@@ -294,8 +306,13 @@ def run_pipeline(
             value_weight=1.0,
             device=device,
             save_every=training_epochs  # Only save final
-        )
+        ) or {}
         timings['train'] = time.time() - t
+        best_epoch = train_info.get('best_epoch', None)
+        # best_epoch == 0 means the pre-training validation loss was lower
+        # than every trained-epoch loss → model_best.pth is byte-identical
+        # to current_model_path, so we can reuse trunk_stats and skip Step 4.
+        skip_eval = (best_epoch == 0) and (trunk_stats is not None)
         # Free the training-time model/optimizer GPU buffers before the
         # candidate-eval pool tries to allocate.
         _release_cuda()
@@ -307,21 +324,39 @@ def run_pipeline(
         candidate_model_path = os.path.join(models_dir, f"model_M{iteration}.pth")
         shutil.copy(new_model_path, candidate_model_path)
 
-        # Step 4: Evaluate candidate model at current SF level
-        print(f"\n[Step 4/4] Evaluating candidate (M{iteration}) vs Stockfish level {current_sf_level}...")
-        t = time.time()
-        eval_stats = evaluate_model(
-            model_path=candidate_model_path,
-            stockfish_path=stockfish_path,
-            num_games=eval_games,
-            stockfish_level=current_sf_level,
-            stockfish_time=0.1,
-            device=device,
-            num_workers=num_workers,
-            search_depth=search_depth
-        )
-        timings['candidate_eval'] = time.time() - t
+        # Step 4: Evaluate candidate model at current SF level.
+        # When training did not improve val loss over the pre-training model,
+        # the candidate is byte-identical to the trunk model, which was already
+        # benchmarked this level (either as baseline this iter or as candidate
+        # last iter), so we reuse that score rather than burn ~eval_games games.
+        if skip_eval:
+            print(
+                f"\n[Step 4/4] Skipping eval — pre-training val loss was best "
+                f"(epoch 00, loss {train_info.get('epoch_0_val_loss', float('nan')):.4f}); "
+                f"reusing trunk score {trunk_stats['score']:.3f} from this level's earlier eval."
+            )
+            eval_stats = trunk_stats
+            timings['candidate_eval'] = 0.0
+        else:
+            print(f"\n[Step 4/4] Evaluating candidate (M{iteration}) vs Stockfish level {current_sf_level}...")
+            t = time.time()
+            eval_stats = evaluate_model(
+                model_path=candidate_model_path,
+                stockfish_path=stockfish_path,
+                num_games=eval_games,
+                stockfish_level=current_sf_level,
+                stockfish_time=0.1,
+                device=device,
+                num_workers=num_workers,
+                search_depth=search_depth,
+                save_pgn_path=os.path.join(games_dir, f"iter{iteration}_candidate_eval.pgn"),
+            )
+            timings['candidate_eval'] = time.time() - t
         candidate_score = eval_stats['score']
+        # Carry these stats forward as the trunk's score for the next iteration
+        # (current_model_path advances to candidate_model_path below regardless
+        # of promotion).
+        trunk_stats = eval_stats
 
         # Promotion decision
         print(f"\n{'='*80}")
@@ -383,6 +418,8 @@ def run_pipeline(
             'losses': eval_stats['losses'],
             'promoted': promoted,
             'level_advanced': level_advanced,
+            'best_epoch': best_epoch,
+            'eval_reused': skip_eval,
             'timings': {k: round(v, 1) for k, v in timings.items()},
             'time_seconds': iter_time
         }
